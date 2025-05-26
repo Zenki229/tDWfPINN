@@ -59,7 +59,7 @@ def main(argv):
                 loss += config.weighting[key] * losses[key]
             loss_save.append(loss.item())
             loss.backward()
-            # err = pde.gen_err(net, points) # Error gen 会显著影响速度
+            # err = pde.gen_err(net, points) # Error generation significantly affects performance
             err = 0.0
             values = [total_count, optim_name] + [losses[key].item() for key in ['in', 'bd', 'init', 'init_dt']]
             values.append(err)

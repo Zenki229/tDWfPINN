@@ -79,20 +79,20 @@ def generate_path_save(config):
         if config.overwrite:
             print(f"Overwriting existing directory: {path_save}")
             time.sleep(2)
-            # 使用 shutil.rmtree 删除整个目录及其内容
+            # Use shutil.rmtree to delete the entire directory and its contents
             shutil.rmtree(path_save)
-            # 重新创建目录
+            # Recreate the directory
             os.makedirs(path_save, exist_ok=True)
             os.mkdir(os.path.join(path_save, 'train'))
             os.mkdir(os.path.join(path_save, 'net'))
             os.mkdir(os.path.join(path_save, 'img'))
         else:
-            # 如果目录存在且不允许覆盖，则抛出错误
+            # If directory exists and overwrite is not allowed, raise an error
             raise FileExistsError(
                 f"Directory {path_save} already exists. Use --overwrite=true to overwrite it."
             )
     else:
-        # 如果目录不存在，则创建它（包括任何必要的父目录）
+        # If directory does not exist, create it (including any necessary parent directories)
         os.makedirs(path_save, exist_ok=True)
         os.mkdir(os.path.join(path_save, 'train'))
         os.mkdir(os.path.join(path_save, 'net'))
