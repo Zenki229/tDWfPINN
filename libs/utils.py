@@ -25,7 +25,6 @@ import torch
 import logging
 import tabulate
 import torch.nn as nn
-from tqdm.auto import tqdm
 # import h5py
 from scipy.io import loadmat
 # matplotlib.use('agg')

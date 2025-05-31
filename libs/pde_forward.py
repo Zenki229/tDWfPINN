@@ -235,7 +235,7 @@ class DWForward(PINN):
         plt.close(fig)
         # val plot
         fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
-        plot = ax.pcolormesh(mesh_t, mesh_x, val.reshape(mesh_x.shape), shading='gouraud', cmap='jet', vmin=np.min(val), vmax=np.max(val))
+        plot = ax.pcolormesh(mesh_t, mesh_x, val.reshape(mesh_x.shape), shading='gouraud', cmap='jet', vmin=np.min(exact), vmax=np.max(exact))
         fig.colorbar(plot,  ax=ax, format="%1.1e")
         ax.set_xlabel('t')
         ax.set_ylabel('x')

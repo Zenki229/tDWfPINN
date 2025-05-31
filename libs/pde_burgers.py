@@ -9,14 +9,8 @@ class DWBurgers(PINN):
     def __init__(self, config):
         super().__init__(config)
         self.al = config.al
-        if self.al==1.5:
-            self.datafile = './data/burgers_150.npz'
-        elif self.al==1.25:
-            self.datafile = './data/burgers_125.npz'
-        elif self.al==1.75:
-            self.datafile = './data/burgers_175.npz'
-        else:
-            raise ValueError('alpha must be 1.5, 1.25 or 1.75')
+        self.datafile = config.datafile
+        self.beta = config.beta
         self.xlim=config.xlim 
         self.tlim=config.tlim
         if 'GJ' in config.method:
@@ -37,10 +31,9 @@ class DWBurgers(PINN):
         losses = {}
         # generate residual in the domain
         points = points_all['in']
-        f= self.source(points)
         dt, dx, dxx = self.frac_diff(net, points) 
         val = self.u_net(net, points)
-        losses['in'] = dt+val*dx - 0.01/torch.pi*dxx-f #N*1 
+        losses['in'] = dt+val*dx - 0.01/torch.pi*dxx #N*1 
         # generate residual on boundary 
         points = points_all['bd']
         pred = self.u_net(net,points)
@@ -51,7 +44,7 @@ class DWBurgers(PINN):
         losses['init'] = self.u_net(net,points) - pred #N*1
         # generate residual on 1st derivative initial condition
         points = points_all['init']
-        pred = torch.zeros_like(points[:, 1:2]).to(device=self.config.dev) #N*1
+        pred = self.beta*torch.sin(np.pi*points[:, 1:2]).to(device=self.config.dev) #N*1
         points.requires_grad = True
         val = self.u_net(net,points)
         dt  = torch.autograd.grad(outputs=val, inputs=points, grad_outputs=torch.ones_like(val),retain_graph=True,    create_graph=True)[0][:,0:1]#N*1 
@@ -218,8 +211,8 @@ class DWBurgers(PINN):
     def exact(self, points):
         data = np.load(self.datafile)
         t = data['t'] #(200,) 
-        x = data['x']#(200,)
-        u = data['u'] #(200,200)
+        x = data['x']#(100,)
+        u = data['u'] #(200,100)
         return u.reshape(-1,1) # 40000*1
     def gen_err(self, net, points):
         pass
@@ -228,8 +221,8 @@ class DWBurgers(PINN):
         config = self.config
         data = np.load(self.datafile)
         t = data['t'] #(200,)
-        x = data['x']#(200,)
-        u = data['u'].T #(200,200)
+        x = data['x']#(100,)
+        u = data['u'].T #(100,200)
         mesh_t, mesh_x = np.meshgrid(t,x)
         points = np.stack([mesh_t.flatten(), mesh_x.flatten()], axis=1) #N*2
         points_tensor = torch.tensor(points, device=config.dev)
@@ -249,7 +242,7 @@ class DWBurgers(PINN):
         plt.close(fig)
         # val plot
         fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
-        plot = ax.pcolormesh(mesh_t, mesh_x, val.reshape(mesh_x.shape), shading='gouraud', cmap='jet', vmin=np.min(val), vmax=np.max(val))
+        plot = ax.pcolormesh(mesh_t, mesh_x, val.reshape(mesh_x.shape), shading='gouraud', cmap='jet', vmin=np.min(exact), vmax=np.max(exact))
         fig.colorbar(plot,  ax=ax, format="%1.1e")
         ax.set_xlabel('t')
         ax.set_ylabel('x')

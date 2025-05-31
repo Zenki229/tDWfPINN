@@ -45,6 +45,7 @@ def main(argv):
     adam_end_time = 0.0
     lbfgs_end_time = 0.0
     optim_name='adam'
+    config.weighting = {'in':config.weight_param[0], 'bd':config.weight_param[1], 'init': config.weight_param[2], 'init_dt':config.weight_params[3]}
     def closure():
         nonlocal total_count, optim_name
         adam.zero_grad() if optim_name == 'adam' else lbfgs.zero_grad()
