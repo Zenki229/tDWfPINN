@@ -17,9 +17,11 @@ class DWForward(PINN):
             nums = GJ.nums
             quad_t, quad_wt = roots_jacobi(nums, 0, 1-self.al)
             self.quad_t = (quad_t + 1) / 2
-            self.quad_w = quad_wt * (1 / 2) ** (self.al-1)
+            self.quad_w = quad_wt * (1 / 2) ** (2-self.al)
         self.k = config.k
-        self.lam = config.lam
+        self.lam = eval(config.lam)
+        self.a=config.a
+        self.b=config.b
     def u_net(self, net, points):
         return net(points)
     def source(self, points): #points N*2 
@@ -36,11 +38,11 @@ class DWForward(PINN):
         losses['bd'] = pred
         # generate residual on initial condition
         points = points_all['init']
-        pred = torch.sin(self.k*np.pi*points[:, 1:2]).to(device=self.config.dev) #N*1
+        pred = self.a*torch.sin(self.k*np.pi*points[:, 1:2]).to(device=self.config.dev) #N*1
         losses['init'] = self.u_net(net,points) - pred #N*1
         # generate residual on 1st derivative initial condition
         points = points_all['init']
-        pred = -0.5*torch.sin(self.k*np.pi*points[:, 1:2]).to(device=self.config.dev) #N*1
+        pred = self.b*torch.sin(self.k*np.pi*points[:, 1:2]).to(device=self.config.dev) #N*1
         points.requires_grad = True
         val = self.u_net(net,points)
         dt  = torch.autograd.grad(outputs=val, inputs=points, grad_outputs=torch.ones_like(val),retain_graph=True,    create_graph=True)[0][:,0:1]#N*1 
@@ -210,7 +212,7 @@ class DWForward(PINN):
         t = points[:, 0:1] #N*1 
         x = points[:, 1:2] #N*1
         part1 = np.sin(self.k*np.pi*x) #N*1 
-        part2 = self.mitlef(self.al, 1.0, -self.lam*np.power(t,self.al)) - 0.5*t*self.mitlef(self.al, 2.0, -self.lam*np.power(t,self.al)) #N*1
+        part2 = self.a*self.mitlef(self.al, 1.0, -self.lam*np.power(t,self.al)) + self.b*t*self.mitlef(self.al, 2.0, -self.lam*np.power(t,self.al)) #N*1
         return part1*part2 #N*1
     def evaluator(self, net, count):
         config = self.config

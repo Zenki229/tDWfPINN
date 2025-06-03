@@ -18,7 +18,7 @@ class DWBurgers(PINN):
             nums = GJ.nums
             quad_t, quad_wt = roots_jacobi(nums, 0, 1-self.al)
             self.quad_t = (quad_t + 1) / 2
-            self.quad_w = quad_wt * (1 / 2) ** (self.al-1)
+            self.quad_w = quad_wt * (1 / 2) ** (2-self.al)
     def u_net(self, net, points):
         # compute the exact solution of the IVP
         return net(points)
