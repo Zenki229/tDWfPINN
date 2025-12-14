@@ -1,0 +1,51 @@
+model:
+  name: Mlp
+  input_dim: 2
+  num_layers: 2
+  hidden_dim: 2
+  output_dim: 1
+  activation: tanh
+pde:
+  name: debug_eg1
+  al: 1.5
+  beta: 2.0
+  xlim:
+  - - 0
+    - 1
+  tlim:
+  - 0
+  - 1
+  method: GJ-II
+  MC:
+    nums: 50
+    eps: 1.0e-10
+  GJ:
+    nums: 50
+  RAD:
+    use: true
+    ratio: 0.8
+    batch:
+      in: 10000
+      bd: 2
+      init: 2
+  weighting:
+    in: 1
+    bd: 1
+    init: 1
+    init_dt: 1
+training:
+  optimizer: adam
+  lr: 0.001
+  max_steps: 2
+  batch:
+    in: 1000
+    bd: 10
+    init: 10
+mode: train
+version: v1
+seed: 42
+cuda_dev: 0
+wandb:
+  project: jax-pinn
+  entity: null
+  mode: disabled

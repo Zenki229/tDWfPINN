@@ -20,6 +20,10 @@ def get_pde_loss(params, apply_fn, pde, batch, key, weights):
     # We need to compute scalar loss
     losses = pde.residual(apply_fn, params, batch, key)
     
+    # Convert weights to dict if it's a tuple (for hashing)
+    if isinstance(weights, tuple):
+        weights = dict(weights)
+
     total_loss = 0.0
     loss_dict = {}
     
@@ -127,6 +131,8 @@ def main(cfg: DictConfig):
 
     # Weights
     weights = OmegaConf.to_container(cfg.pde.weighting)
+    # Convert to tuple for hashing in pmap
+    weights = tuple(sorted(weights.items()))
 
     # Training Loop
     iterator = iter(sampler)
@@ -139,7 +145,7 @@ def main(cfg: DictConfig):
         batch_sharded = shard(batch_cpu, n_devices)
         
         # Train step
-        state, loss, aux, pmap_keys = train_step(state, batch_sharded, pmap_keys, pde, weights)
+        state, loss, aux, pmap_keys = train_step(state, batch_sharded, pmap_keys, pde, weights, 1)
         
         # Logging (take first device output)
         if step % 100 == 0 or step == cfg.training.max_steps - 1:
@@ -159,10 +165,19 @@ def main(cfg: DictConfig):
 
     # Save model (taking first device params)
     # state.params is replicated
-    params_cpu = jax.device_get(jax.tree_map(lambda x: x[0], state.params))
+    params_cpu = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
     
-    # Save code here...
+    # Save parameters
+    save_dir = os.path.join(os.getcwd(), 'checkpoints')
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f'model_step_{cfg.training.max_steps}.npy')
+    # Flatten params dictionary for saving or use pickle
+    # Simple pickle save
+    import pickle
+    with open(save_path.replace('.npy', '.pkl'), 'wb') as f:
+        pickle.dump(params_cpu, f)
     
+    print(f"Model saved to {save_path.replace('.npy', '.pkl')}")
     print("Training finished.")
 
 if __name__ == "__main__":

@@ -14,6 +14,30 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+### Installing JAX with CUDA (GPU) Support
+
+**Note:** The default `requirements.txt` installs the CPU-only version of JAX on Windows/Linux if not specified otherwise. To run on an NVIDIA GPU, you need to install the CUDA-enabled version of `jax` and `jaxlib`.
+
+#### Linux (Recommended)
+Run the following command to install JAX with CUDA 12 support:
+```bash
+pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+*If you are using CUDA 11, replace `cuda12_pip` with `cuda11_pip`.*
+
+#### Windows
+JAX's official GPU support on Windows is experimental. However, you can try:
+```bash
+pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+*Note: You might need to use WSL2 (Windows Subsystem for Linux) for the best experience and performance on Windows.*
+
+Verify GPU detection:
+```bash
+python -c "import jax; print(jax.devices())"
+```
+Should output something like `[GpuDevice(id=0, process_index=0), ...]`.
+
 ## Directory Structure
 - `libs/`
   - `jax_pinn.py`: Flax-based MLP implementation.
