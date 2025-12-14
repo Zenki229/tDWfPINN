@@ -1,0 +1,7 @@
+optimizer: adam
+lr: 1e-3
+max_steps: 2
+batch:
+  in: 1000
+  bd: 10
+  init: 10

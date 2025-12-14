@@ -21,10 +21,14 @@ import psutil
 import platform
 import subprocess
 import re
-import torch
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    torch = None
+    nn = None
 import logging
 import tabulate
-import torch.nn as nn
 # import h5py
 from scipy.io import loadmat
 # matplotlib.use('agg')
@@ -156,17 +160,20 @@ def get_system():
     print('Python     : ' + sys.version.split('\n')[0])
     print('Numpy      : ' + np.__version__)
     # print('Pandas     : ' + pd.__version__)
-    print('PyTorch    : ' + torch.__version__)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch:
+        print('PyTorch    : ' + torch.__version__)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if device.type == 'cuda':
-        print("="*40, "GPU Info", "="*40)
-        print(f'Device     : {torch.cuda.get_device_name(0)}')
-        print(f"{'Mem total': <15}: {round(torch.cuda.get_device_properties(0).total_memory/1024**3,1)} GB")
-        print(
-            f"{'Mem allocated': <15}: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB")
-        print(
-            f"{'Mem cached': <15}: {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB")
+        if device.type == 'cuda':
+            print("="*40, "GPU Info", "="*40)
+            print(f'Device     : {torch.cuda.get_device_name(0)}')
+            print(f"{'Mem total': <15}: {round(torch.cuda.get_device_properties(0).total_memory/1024**3,1)} GB")
+            print(
+                f"{'Mem allocated': <15}: {round(torch.cuda.memory_allocated(0)/1024**3,1)} GB")
+            print(
+                f"{'Mem cached': <15}: {round(torch.cuda.memory_reserved(0)/1024**3,1)} GB")
+    else:
+        print('PyTorch    : Not installed')
 
     print("="*30, "system info print done", "="*30)
 
@@ -177,30 +184,34 @@ def get_seed(s, printout=True, cudnn=True):
     np.random.seed(s)
     # pd.core.common.random_state(s)
     # Torch
-    torch.manual_seed(s)
-    torch.cuda.manual_seed(s)
-    if cudnn:
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(s)
+    if torch:
+        torch.manual_seed(s)
+        torch.cuda.manual_seed(s)
+        if cudnn:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(s)
 
     message = f'''
     os.environ['PYTHONHASHSEED'] = str({s})
     numpy.random.seed({s})
-    torch.manual_seed({s})
-    torch.cuda.manual_seed({s})
     '''
-    if cudnn:
+    if torch:
         message += f'''
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+        torch.manual_seed({s})
+        torch.cuda.manual_seed({s})
         '''
+        if cudnn:
+            message += f'''
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            '''
 
-    if torch.cuda.is_available():
-        message += f'''
-        torch.cuda.manual_seed_all({s})
-        '''
+        if torch.cuda.is_available():
+            message += f'''
+            torch.cuda.manual_seed_all({s})
+            '''
     if printout:
         print("\n")
         print(f"The following code snippets have been run.")

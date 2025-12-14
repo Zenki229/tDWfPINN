@@ -1,0 +1,11 @@
+jax
+jaxlib
+flax
+optax
+hydra-core
+wandb
+matplotlib
+numpy
+scipy
+absl-py
+ml_collections

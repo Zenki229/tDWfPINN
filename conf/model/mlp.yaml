@@ -1,0 +1,6 @@
+name: Mlp
+input_dim: 2
+num_layers: 2
+hidden_dim: 2
+output_dim: 1
+activation: tanh

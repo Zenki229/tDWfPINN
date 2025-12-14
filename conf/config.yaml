@@ -1,0 +1,19 @@
+defaults:
+  - model: mlp
+  - pde: burgers
+  - training: default
+  - _self_
+
+mode: train
+version: v1
+seed: 42
+cuda_dev: 0
+
+wandb:
+  project: "jax-pinn"
+  entity: null
+  mode: "online" # or disabled
+
+hydra:
+  run:
+    dir: outputs/${pde.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}

@@ -1,0 +1,23 @@
+name: debug_eg1
+al: 1.5
+beta: 2.0
+xlim: [[0, 1]]
+tlim: [0, 1]
+method: GJ-II
+MC:
+  nums: 50
+  eps: 1.0e-10
+GJ:
+  nums: 50
+RAD:
+  use: True
+  ratio: 0.8
+  batch:
+    in: 10000
+    bd: 2
+    init: 2
+weighting:
+  in: 1
+  bd: 1
+  init: 1
+  init_dt: 1
