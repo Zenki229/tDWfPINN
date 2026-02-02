@@ -1,0 +1,11 @@
+numpy
+torch
+scipy
+hydra-core
+wandb
+plotly
+tqdm
+pymittagleffler
+omegaconf
+pytest
+kaleido==0.2.1

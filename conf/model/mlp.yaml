@@ -1,0 +1,6 @@
+_target_: src.models.net.MLP
+input_dim: 2
+output_dim: 1
+hidden_dim: 20
+num_layers: 4
+activation: tanh

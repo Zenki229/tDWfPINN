@@ -1,0 +1,10 @@
+name: adam
+lr: 1e-3
+epochs: 1000
+lbfgs:
+  use: false
+  lr: 0.1
+  max_iter: 10
+  max_eval: 10
+  history_size: 50
+  epochs: 2

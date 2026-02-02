@@ -1,13 +1,71 @@
-# tDWfPINNs
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/)
-[![Pytorch 1.13](https://img.shields.io/badge/pytorch-1.13-blue.svg)](https://pytorch.org/)
+# tDWfPINN: Transformed Diffusion-Waved Fractional PINNs
 
-<!-- [//]: # ([![arXiv]&#40;https://img.shields.io/badge/arXiv-2209.14977-b31b1b.svg&#41;]&#40;https://arxiv.org/abs/2209.14977&#41;) -->
+Refactored professional codebase for solving fractional PINNs using **Hydra** (Configuration), **Weights & Biases** (Experiment Tracking), and **Plotly** (Interactive Visualization).
 
-## Summary
-An efficient numerical implementation for fractional PINNs with order $\alpha\in(1,2)$.
+## 🚀 Features
+- **Hierarchical Configuration**: Manage experiments via `conf/` using Hydra.
+- **Experiment Tracking**: Automatic logging of metrics, gradients, and artifacts to WandB.
+- **Interactive Visualization**: Heatmaps and scatter plots with Plotly, saving raw data for reproducibility.
+- **Modular Design**: Strict separation of Physics, Model, Data, and Training logic.
+- **Reproducibility**: Global seeding and explicit version control logging.
 
+## 📂 Directory Structure
+```
+tDWfPINN/
+├── conf/              # Hydra Configuration
+│   ├── config.yaml    # Main config
+│   ├── model/         # Architecture settings
+│   ├── pde/           # Physics parameters
+│   └── experiment/    # Reproducible presets
+├── src/               # Source Code
+│   ├── data/          # Samplers (TimeSpaceSampler)
+│   ├── models/        # Neural Networks (MLP)
+│   ├── physics/       # PDE definitions & Fractional Ops
+│   ├── vis/           # Plotly Visualization
+│   └── train.py       # Main Entry Point
+└── tests/             # Unit Tests
+```
 
-## Training
-In config dir you can find the config files for different pdes.
+## 🛠 Installation
+```bash
+pip install -r requirements.txt
+# Ensure pymittagleffler is installed
+```
+
+## 🏃 Usage
+
+### Basic Training
+```bash
+python src/train.py
+```
+
+### Debug Mode (Fast Run)
+```bash
+python src/train.py experiment=debug
+```
+
+### Overriding Parameters (Hydra Syntax)
+```bash
+# Change learning rate and max steps
+python src/train.py optimizer.lr=0.005 training.max_steps=5000
+
+# Change PDE alpha
+python src/train.py pde.alpha=1.5
+```
+
+## 📊 Output
+- **Logs**: WandB dashboard (online or offline).
+- **Checkpoints**: Saved in `outputs/YYYY-MM-DD/HH-MM-SS/`.
+- **Plots**: Interactive HTML and raw `.npz` data in `outputs/.../plots/` and `raw_data/`.
+
+## 📐 Mathematical Notation
+| Symbol | Meaning | Code Variable |
+| :--- | :--- | :--- |
+| $\alpha$ | Fractional Order | `pde.alpha` |
+| $\lambda$ | Diffusion Coefficient | `pde.lambda_val` |
+| $N$ | Batch Size (Domain) | `training.batch_size.domain` |
+
+## 🧪 Testing
+```bash
+pytest tests/
+```

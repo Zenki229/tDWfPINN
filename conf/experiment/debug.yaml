@@ -1,0 +1,23 @@
+# @package _global_
+hydra:
+  run:
+    dir: outputs/debug/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+model:
+  hidden_dim: 2
+  num_layers: 2
+
+optimizer:
+  epochs: 400
+  lbfgs:
+    use: false
+
+training:
+  max_steps: 2
+  batch_size:
+    domain: 100
+    boundary: 10
+    initial: 10
+
+wandb:
+  mode: "disabled"
