@@ -1,0 +1,17 @@
+max_steps: 2000
+batch_size:
+  domain: 100
+  boundary: 10
+  initial: 10
+rad:
+  use: true
+  ratio: 0.8
+  batch:
+    domain: 1000
+    boundary: 2
+    initial: 2
+wandb:
+  project: "tDWfPINN"
+  entity: null
+  mode: "disabled" # Default to disabled for dev, user can enable
+  group: null
