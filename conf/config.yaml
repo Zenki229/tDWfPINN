@@ -3,7 +3,7 @@ defaults:
   - model: mlp
   - pde: dw_forward
   - optimizer: adam
-  - training: default
+  - trainer: default
 
 hydra:
   job:
@@ -13,6 +13,12 @@ hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
+
+wandb:
+  project: "tDWfPINN"
+  entity: null
+  mode: "disabled" # Default to disabled for dev, user can enable
+  group: null
 
 seed: 42
 work_dir: ${hydra:runtime.cwd}

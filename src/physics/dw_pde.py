@@ -25,7 +25,9 @@ class DWForward(PDE):
         self.lam = cfg.pde.lambda_val
         self.x_lim = cfg.pde.x_lim
         self.t_lim = cfg.pde.t_lim
-        
+        self.a = getattr(cfg.pde, 'a', 1.0)
+        self.b = getattr(cfg.pde, 'b', 1.0)
+
         # Method specific setup
         self.method = cfg.pde.method
         if 'GJ' in self.method:
@@ -34,13 +36,11 @@ class DWForward(PDE):
             self.quad_t = (quad_t + 1) / 2
             self.quad_w = quad_wt * (1 / 2) ** (2 - self.alpha)
         
-        self.a = getattr(cfg.pde, 'a', 1.0)
-        self.b = getattr(cfg.pde, 'b', 1.0)
 
-    def u_net(self, net: torch.nn.Module, points: Tensor) -> Tensor:
+    def u_net(self, net: torch.nn.Module, points: torch.Tensor) -> torch.Tensor:
         return net(points)
 
-    def residual(self, net: torch.nn.Module, points_all: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def residual(self, net: torch.nn.Module, points_all: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         losses = {}
         
         # Domain Residual
@@ -84,6 +84,7 @@ class DWForward(PDE):
 
     def frac_diff(self, net: torch.nn.Module, points: Tensor) -> Tuple[Tensor, Tensor]:
         val = self.u_net(net, points)
+        points.requires_grad = True
         grads = torch.autograd.grad(
             outputs=val,
             inputs=points,
@@ -102,13 +103,57 @@ class DWForward(PDE):
             retain_graph=True,
             create_graph=True
         )[0][:, 1:2]
-        
+        points.detach()
+        points.requires_grad = False
         if self.method == 'GJ-II':
-            return self._gj_ii(net, points, points[:, 0:1], points[:, 1:], val, dt, dxx)
+            return self._gj_ii(net, points, points[:, 0:1], points[:, 1:], val, dt), dxx 
         elif self.method == 'MC-I':
-            return self._mc_i(net, points, points[:, 0:1], points[:, 1:], val, dt, dxx)
+            return self._mc_i(net, points, points[:, 0:1], points[:, 1:], val, dt), dxx 
+        elif self.method == 'MC-II':
+            return self._mc_ii(net, points, points[:, 0:1], points[:, 1:], val, dt, dxx)
+        elif self.method == 'GJ-I':
+            return self._gj_i(net, points, points[:, 0:1], points[:, 1:], val, dt, dxx)
         else:
-            return self._gj_ii(net, points, points[:, 0:1], points[:, 1:], val, dt, dxx)
+            raise ValueError(f"Unknown method: {self.method}")
+    def _mc_i(self, net, points:torch.tensor, t, x, val, dt, dxx): 
+        """
+            compute fractional derivative(MC-I) in Corollary 3.1 in the paper.
+            Args:
+                net: neural network model
+                points: input points (t, x)
+                t: time coordinate
+                x: spatial coordinate
+                val: network output at points
+                dt: time derivative of val
+                dxx: spatial second derivative of val
+            Returns:
+                dtal: fractional time derivative of val
+                dxx: spatial second derivative of val
+        """
+        monte_carlo_nums = self.cfg.pde.monte_carlo_params.nums
+        monte_carlo_eps = self.cfg.pde.monte_carlo_params.eps
+        alpha = self.alpha  
+        num_points = len(points) 
+        #coeff for 1/\Gamma(2-\alpha)
+        coeff_for_frac_dt = sp.gamma(2-alpha)
+        samling_points_monte_carlo = beta.rvs(2-alpha, 1, size=monte_carlo_nums)
+        sampling_points_monte_carlo_to_tensor:torch.Tensor=torch.from_numpy(samling_points_monte_carlo).to(self.device)
+        # compute u'(0,x)
+        t_at_0 = torch.cat((torch.zeros_like(points[:,0:1]), points[:, 1:]), dim=1).to(device=self.device)
+        t_at_0.require_grad = True 
+        solution_at_0 = self.u_net(net, t_at_0) 
+        dt_at_0 = torch.autograd.grad(outputs=solution_at_0, inputs=t_at_0, grad_outputs=torch.ones_like(solution_at_0), create_graph=True, retain_graph=True)[0][:, 0:1]  # [num, 1]
+        t_at_0.require_grad=False
+        # compute u'(t-t_tau, x)
+        t_at_t = points[:, 0:1] #[num, 1]
+        sampling_points_monte_carlo_to_tensor = sampling_points_monte_carlo_to_tensor.unsqueeze(-1) # [M, 1]
+        t_at_t_tau = t_at_t * sampling_points_monte_carlo_to_tensor #t\tau, [M, num]
+        t_at_t_minus_t_tau = points[:, 0] - t_at_t_tau #t-t\tau, [M, num] 
+        t_at_threshold_eps_t_tau = torch.maximum(t_at_t_tau, torch.tensor(monte_carlo_eps).to(self.device)) #[M, num]
+        x_at_x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points) # [M, num]
+        
+
+
 
     def _gj_ii(self, net, points, t, x, val, dt, dxx):
         al = self.alpha

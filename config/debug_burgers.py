@@ -7,6 +7,7 @@ def get_config():
     """Get the default hyperparameter configuration."""
     config = ml_collections.ConfigDict()
     config.mode = "train"
+ 
     # save
     config.version = "v1"
     config.dir = ml_collections.ConfigDict()
@@ -41,12 +42,13 @@ def get_config():
 
     #pde setting
     config.al = 1.5
+    config.datafile  = "./data/burgers_150.npz"
     config.beta = 2.0
     config.xlim = [[0,1]]
     config.tlim = [0,1]
     config.weighting = {'in':1, 'bd':1, 'init': 1, 'init_dt':1}
     # # Training
-    config.cuda_dev = 0 # Default on cuda:0
+    config.cuda_dev = "0" # Default on cuda:0
     config.training = training = ml_collections.ConfigDict()
     training.max_steps = 2
     training.batch = {'in':1000,'bd':10,'init':10}

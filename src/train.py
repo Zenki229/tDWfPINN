@@ -17,13 +17,12 @@ from src.vis.plotter import Plotter
 log = logging.getLogger(__name__)
 
 class Trainer:
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: DictConfig, run: wandb.run):
         self.cfg = cfg
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Setup
         set_seed(cfg.seed)
-        setup_wandb(cfg)
         
         # Components
         self.model = hydra.utils.instantiate(cfg.model).to(self.device)
@@ -223,7 +222,8 @@ class Trainer:
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info(OmegaConf.to_yaml(cfg))
-    trainer = Trainer(cfg)
+    run:wandb.run = setup_wandb(cfg)
+    trainer = Trainer(cfg, run)
     trainer.train()
 
 if __name__ == "__main__":

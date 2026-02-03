@@ -25,7 +25,7 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
     log.info(f"Random seed set to {seed}")
 
-def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> None:
+def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> wandb.run:
     """
     Initialize Weights & Biases logging.
 
@@ -33,16 +33,13 @@ def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> None:
         cfg (DictConfig): The full Hydra configuration.
         model (torch.nn.Module, optional): Model to watch.
     """
-    wandb.init(
-        project=cfg.training.wandb.project,
-        entity=cfg.training.wandb.entity,
-        group=cfg.training.wandb.group,
-        mode=cfg.training.wandb.mode,
+    run = wandb.init(
+        project=cfg.wandb.project,
+        entity=cfg.wandb.entity,
+        group=cfg.wandb.group,
+        mode=cfg.wandb.mode,
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
         dir=os.getcwd(),
     )
-    
-    if model:
-        wandb.watch(model, log="all", log_freq=100)
-    
-    log.info(f"WandB initialized for project {cfg.training.wandb.project}")
+    log.info(f"WandB initialized for project {cfg.wandb.project}")
+    return run 

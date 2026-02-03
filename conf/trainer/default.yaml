@@ -10,8 +10,4 @@ rad:
     domain: 1000
     boundary: 2
     initial: 2
-wandb:
-  project: "tDWfPINN"
-  entity: null
-  mode: "disabled" # Default to disabled for dev, user can enable
-  group: null
+

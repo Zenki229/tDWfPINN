@@ -12,7 +12,7 @@ optimizer:
   lbfgs:
     use: false
 
-training:
+trainer:
   max_steps: 2
   batch_size:
     domain: 100
@@ -20,4 +20,7 @@ training:
     initial: 10
 
 wandb:
-  mode: "disabled"
+  project: "tDWfPINN-debug"
+  entity: null
+  mode: "disabled" # Default to disabled for dev, user can enable
+  group: null

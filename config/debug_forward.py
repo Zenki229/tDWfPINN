@@ -22,7 +22,7 @@ def get_config():
     # # Optim
     config.adam = adam = ml_collections.ConfigDict()
     adam.lr = 1e-3
-    adam.epoch = 400
+    adam.epoch = 10
     config.lbfgs= lbfgs = ml_collections.ConfigDict()
     lbfgs.use=False
     lbfgs.max_iter=10
@@ -39,15 +39,18 @@ def get_config():
     config.GJ = GJ = ml_collections.ConfigDict()
     GJ.nums = 1000
 
+    config.a=1.0
+    config.b=-0.5
     #pde setting
     config.al = 1.75
     config.k = 2
-    config.lam=1.0
+    config.lam="1.0"
     config.xlim = [[0,1]]
     config.tlim = [0,2]
+    config.weight_param = (1, 1, 1, 1)
     config.weighting = {'in':1, 'bd':1, 'init': 1, 'init_dt':1}
     # # Training
-    config.cuda_dev = 0 # Default on cuda:0
+    config.cuda_dev = "0" # Default on cuda:0
     config.training = training = ml_collections.ConfigDict()
     training.max_steps = 2
     training.batch = {'in':100,'bd':10,'init':10}

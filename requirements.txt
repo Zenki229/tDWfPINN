@@ -2,6 +2,7 @@ numpy
 torch
 scipy
 hydra-core
+tabulate
 wandb
 plotly
 tqdm
