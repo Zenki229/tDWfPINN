@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 **/results/
+**/outputs/
 # for Latex Extensions
 *.aux
 *.log
