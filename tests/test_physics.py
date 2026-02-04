@@ -1,23 +1,53 @@
+import os
+import sys
 import pytest
 import numpy as np
 import torch
+from omegaconf import OmegaConf
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.physics.fractional import mitlef, roots_jacobi
+from src.physics.dw_eg1 import *
+from src.vis.plotter import Plotter
 
-def test_mittag_leffler_identity():
-    # E_alpha,beta(0) = 1 / Gamma(beta)
-    # If beta=1, E(0)=1
-    val = mitlef(1.5, 1.0, np.array([0.0]))
-    if np.ndim(val) == 0:
-        assert np.isclose(val, 1.0)
-    else:
-        assert np.isclose(val[0], 1.0)
 
-def test_roots_jacobi_shapes():
-    n = 10
-    roots, weights = roots_jacobi(n, 0, 0.5)
-    assert len(roots) == n
-    assert len(weights) == n
+def test_fraction_operator_with_plot():
+    alpha = 1.50
+    work_dirs = "tests/test_fractional"
+    os.makedirs(work_dirs, exist_ok=True)
+    torch.manual_seed(0)
+    np.random.seed(0)
 
-def test_fractional_operator_shapes():
-    # Mocking would be needed for complex integration tests
-    pass
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    t_eval = np.linspace(1e-3, 1.0, 50)
+    x_eval = np.linspace(0.0, 1.0, 50)
+    T, X = np.meshgrid(t_eval, x_eval)
+    points_np = np.stack([T.flatten(), X.flatten()], axis=1)
+    points = torch.from_numpy(points_np).to(device=device, dtype=torch.float64)
+    plotter = Plotter(work_dirs)
+
+    methods = ["MC-I", "MC-II", "GJ-I", "GJ-II"]
+    for idx, method in enumerate(methods):
+        cfg = OmegaConf.create({
+            "pde": {
+                "alpha": alpha,
+                "method": method,
+                "monte_carlo_params": {"nums": 80, "eps": 1e-10},
+                "gj_params": {"nums": 120}
+            }
+        })
+        pde = DWForwardEg1(cfg, device)
+        dt_alpha, _ = pde.frac_diff(
+            net=None,
+            points=points,
+            solution_fn=pde.exact)
+        u_val = pde.exact(points)
+        dt_alpha_true = -pde.lam * u_val
+        rel_err = torch.linalg.norm(dt_alpha - dt_alpha_true) / torch.linalg.norm(dt_alpha_true)
+        if method in ["MC-I", "MC-II"]:
+            assert rel_err.item() < 0.6
+        else:
+            assert rel_err.item() < 0.4
+        dt_alpha_np = dt_alpha.detach().cpu().numpy().reshape(T.shape)
+        dt_alpha_true_np = dt_alpha_true.detach().cpu().numpy().reshape(T.shape)
+        plotter.plot_solution(T, X, dt_alpha_np, dt_alpha_true_np, idx)
+    

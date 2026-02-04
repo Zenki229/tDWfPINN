@@ -213,7 +213,7 @@ class DWForward(PINN):
         x = points[:, 1:2] #N*1
         part1 = np.sin(self.k*np.pi*x) #N*1 
         part2 = self.a*self.mitlef(self.al, 1.0, -self.lam*np.power(t,self.al)) + self.b*t*self.mitlef(self.al, 2.0, -self.lam*np.power(t,self.al)) #N*1
-        return part1*part2 #N*1
+        return part1* part2 #N*1
     def evaluator(self, net, count):
         config = self.config
         plt.rcParams.update({'font.size': 14})
