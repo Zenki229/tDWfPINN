@@ -4,6 +4,7 @@ defaults:
   - pde: dw_forward
   - optimizer: adam
   - trainer: default
+  - plot: plotly
 
 hydra:
   job:

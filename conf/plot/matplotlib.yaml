@@ -1,0 +1,4 @@
+backend: matplotlib
+jpg: true
+font_size: 14
+dpi: 100

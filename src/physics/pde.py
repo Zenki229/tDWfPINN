@@ -19,6 +19,12 @@ class PDE(nn.Module):
 
     def exact(self, points: Tensor) -> Tensor:
         raise NotImplementedError
+    
+    def exact_dt(self, points:Tensor) -> Tensor: 
+        """
+            return the 1st derivative of exact solution with respect to time if it is analytically defined. 
+        """
+        pass 
 
 class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
     def __init__(self, cfg: DictConfig, device: torch.device, alpha: float):
@@ -227,3 +233,122 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         part3 = (dt - dt0) / torch.pow(points[:, 0:1], alpha - 1)
         dt_alpha = (part3 - part2 - part1) / coeff_for_frac_dt
         return dt_alpha
+
+    def frac_diff_exact(self, points:torch.Tensor):
+        """
+            compute the true dtal u with self.exact method
+        """
+        def eval_exact(pts: torch.Tensor) -> torch.Tensor:
+            original_shape = pts.shape[:-1]
+            flat = pts.reshape(-1, 2)
+            val = self.exact(flat)
+            return val.reshape(*original_shape, 1)
+
+        def eval_exact_dt(pts: torch.Tensor) -> torch.Tensor:
+            original_shape = pts.shape[:-1]
+            flat = pts.reshape(-1, 2)
+            val = self.exact_dt(flat)
+            return val.reshape(*original_shape, 1)
+
+        val = self.exact(points)
+        dt = self.exact_dt(points)
+        if self.method == 'MC-I':
+            monte_carlo_nums = self.cfg.pde.monte_carlo_params.nums
+            monte_carlo_eps = self.cfg.pde.monte_carlo_params.eps
+            alpha = self.alpha
+            num_points = len(points)
+            coeff_for_frac_dt = sp.gamma(2 - alpha)
+            taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
+            taus = torch.from_numpy(taus).to(self.device)
+            t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
+            dt0 = self.exact_dt(t0)
+            t = points[:, 0:1].clone()
+            taus = taus.unsqueeze(-1)
+            t_tau = t.T * taus
+            t_minus_t_tau = points[:, 0] - t_tau
+            t_tau_clip = torch.maximum(t_tau, torch.tensor(monte_carlo_eps, device=self.device))
+            x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
+            new_points = torch.stack((t_minus_t_tau, x), dim=2)
+            dt_tau = eval_exact_dt(new_points)
+            part1 = torch.mean((dt - dt_tau) / t_tau_clip.unsqueeze(-1), dim=0)
+            part1 *= (alpha - 1.0) / (2.0 - alpha) * torch.pow(points[:, 0:1], 2 - alpha)
+            part2 = (dt - dt0) * torch.pow(points[:, 0:1], 1 - alpha)
+            dt_alpha = (part1 + part2) / coeff_for_frac_dt
+            return dt_alpha
+        if self.method == 'MC-II':
+            monte_carlo_nums = self.cfg.pde.monte_carlo_params.nums
+            monte_carlo_eps = self.cfg.pde.monte_carlo_params.eps
+            alpha = self.alpha
+            num_points = len(points)
+            coeff_for_frac_dt = sp.gamma(2 - alpha)
+            taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
+            taus = torch.from_numpy(taus).to(self.device)
+            t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
+            val0 = self.exact(t0)
+            dt0 = self.exact_dt(t0)
+            t = points[:, 0:1].clone()
+            taus = taus.unsqueeze(-1)
+            t_tau = t.T * taus
+            t_minus_t_tau = points[:, 0] - t_tau
+            t_tau_clip = torch.maximum(t_tau, torch.tensor(monte_carlo_eps, device=self.device))
+            x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
+            new_points = torch.stack((t_minus_t_tau, x), dim=2)
+            val2 = eval_exact(new_points)
+            val3 = t_tau.unsqueeze(-1) * dt.unsqueeze(0)
+            part1 = alpha * (alpha - 1) / (2 - alpha) * torch.pow(points[:, 0:1], 2 - alpha)
+            part1 *= torch.mean((val - val2 - val3) / torch.pow(t_tau_clip.unsqueeze(-1), 2), dim=0)
+            part2 = (alpha - 1) * (val - val0 - points[:, 0:1] * dt) / torch.pow(points[:, 0:1], alpha)
+            part3 = (dt - dt0) / torch.pow(points[:, 0:1], alpha - 1)
+            dt_alpha = (part3 - part2 - part1) / coeff_for_frac_dt
+            return dt_alpha
+        if self.method == 'GJ-I':
+            alpha = self.alpha
+            nums = self.cfg.pde.gj_params.nums
+            num_points = len(points)
+            taus = torch.from_numpy(self.quad_t).to(self.device).float()
+            quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+            quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
+            coeff_for_frac_dt = sp.gamma(2 - alpha)
+            t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
+            dt0 = self.exact_dt(t0)
+            t = points[:, 0:1].clone()
+            taus = taus.unsqueeze(-1)
+            t_tau = t.T * taus
+            t_minus_t_tau = points[:, 0] - t_tau
+            x = points[:, 1].unsqueeze(0).expand(nums, num_points).clone()
+            new_points = torch.stack((t_minus_t_tau, x), dim=2)
+            dt_tau = eval_exact_dt(new_points)
+            part1 = torch.sum(quad_w * (dt - dt_tau) / t_tau.unsqueeze(-1), dim=0)
+            part1 *= (alpha - 1.0) * torch.pow(points[:, 0:1], 2 - alpha)
+            part2 = (dt - dt0) * torch.pow(points[:, 0:1], 1 - alpha)
+            dt_alpha = (part1 + part2) / coeff_for_frac_dt
+            return dt_alpha
+        if self.method == 'GJ-II':
+            alpha = self.alpha
+            coeff_for_frac_dt = sp.gamma(2 - alpha)
+            nums = self.cfg.pde.gj_params.nums
+            num_points = len(points)
+            taus = torch.from_numpy(self.quad_t).to(self.device).float()
+            quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+            quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
+            t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(self.device)
+            val0 = self.exact(t0)
+            dt0 = self.exact_dt(t0)
+            t = points[:, 0:1].clone()
+            taus = taus.unsqueeze(-1)
+            t_tau = t.T * taus
+            t_minus_t_tau = points[:, 0] - t_tau
+            x = points[:, 1].unsqueeze(0).expand(nums, num_points).clone()
+            new_points = torch.stack((t_minus_t_tau, x), dim=2)
+            val2 = eval_exact(new_points)
+            val3 = t_tau * dt.squeeze(-1)
+            part1 = alpha * (alpha - 1) * torch.pow(points[:, 0:1], 2 - alpha)
+            part1 *= torch.sum(
+                quad_w * ((val - val2 - val3.unsqueeze(-1)) / torch.pow(t_tau.unsqueeze(-1), 2)),
+                dim=0
+            )
+            part2 = (alpha - 1) * (val - val0 - points[:, 0:1] * dt) / torch.pow(points[:, 0:1], alpha)
+            part3 = (dt - dt0) / torch.pow(points[:, 0:1], alpha - 1)
+            dt_alpha = (part3 - part2 - part1) / coeff_for_frac_dt
+            return dt_alpha
+        raise ValueError(f"Unknown method: {self.method}")

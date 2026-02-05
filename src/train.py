@@ -12,7 +12,7 @@ from src.utils.experiments import set_seed, setup_wandb
 from src.models.net import MLP
 from src.physics.dw_pde import DWForward
 from src.data.sampler import TimeSpaceSampler
-from src.vis.plotter import Plotter
+from src.vis.plotter import PlotlyPlotter, PltPlotter
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,13 @@ class Trainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=cfg.optimizer.lr)
         
         # Plotter
-        self.plotter = Plotter(os.getcwd())
+        plot_backend = "plotly"
+        if hasattr(cfg, "plot") and hasattr(cfg.plot, "backend"):
+            plot_backend = str(cfg.plot.backend).lower()
+        if plot_backend == "matplotlib":
+            self.plotter = PltPlotter(os.getcwd(), cfg)
+        else:
+            self.plotter = PlotlyPlotter(os.getcwd(), cfg)
         
     def train(self):
         max_steps = self.cfg.training.max_steps
@@ -208,7 +214,13 @@ class Trainer:
             u_pred = self.model(points_tensor).cpu().numpy().reshape(T.shape)
             u_exact = self.pde.exact(points_tensor).cpu().numpy().reshape(T.shape)
             
-            self.plotter.plot_solution(T, X, u_pred, u_exact, step)
+            self.plotter.plot_solution(
+                T,
+                X,
+                u_pred,
+                f"Prediction step {step}",
+                f"prediction_step_{step}"
+            )
             
             # Log error metrics
             l2_error = np.linalg.norm(u_pred - u_exact) / np.linalg.norm(u_exact)

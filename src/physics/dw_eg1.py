@@ -73,4 +73,14 @@ class DWForwardEg1(TimeFracCaputoDiffusionWaveTwoDimPDE):
         
         return torch.from_numpy(part1 * part2).to(self.device)
 
+    def exact_dt(self, points: Tensor) -> Tensor:
+        points_np = points.detach().cpu().numpy()
+        t = points_np[:, 0:1]
+        x = points_np[:, 1:]
+        z = -self.lam * np.power(t, self.alpha)
+        part1 = np.sin(self.k * np.pi * x)
+        part2 = self.a * (-self.lam) * np.power(t, self.alpha - 1) * mitlef(self.alpha, self.alpha, z)
+        part2 = part2 + self.b * mitlef(self.alpha, 1.0, z)
+        return torch.from_numpy(part1 * part2).to(self.device)
+
 #TODO: 

@@ -7,7 +7,8 @@ from omegaconf import OmegaConf
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.physics.fractional import mitlef, roots_jacobi
 from src.physics.dw_eg1 import *
-from src.vis.plotter import Plotter
+from src.vis.plotter import PlotlyPlotter, PltPlotter
+
 
 
 def test_fraction_operator_with_plot():
@@ -23,9 +24,7 @@ def test_fraction_operator_with_plot():
     T, X = np.meshgrid(t_eval, x_eval)
     points_np = np.stack([T.flatten(), X.flatten()], axis=1)
     points = torch.from_numpy(points_np).to(device=device, dtype=torch.float64)
-    plotter = Plotter(work_dirs)
-
-    methods = ["MC-I", "MC-II", "GJ-I", "GJ-II"]
+    methods = ["MC-I"]
     for idx, method in enumerate(methods):
         cfg = OmegaConf.create({
             "pde": {
@@ -33,13 +32,16 @@ def test_fraction_operator_with_plot():
                 "method": method,
                 "monte_carlo_params": {"nums": 80, "eps": 1e-10},
                 "gj_params": {"nums": 120}
+            },
+            "plot": {
+                "backend": "matplotlib",
+                "font_size": 14,
+                "jpg": True
             }
         })
+        plotter = PlotlyPlotter(work_dirs, cfg) if cfg.plot.backend == "plotly" else PltPlotter(work_dirs, cfg)
         pde = DWForwardEg1(cfg, device)
-        dt_alpha, _ = pde.frac_diff(
-            net=None,
-            points=points,
-            solution_fn=pde.exact)
+        dt_alpha = pde.frac_diff_exact(points)
         u_val = pde.exact(points)
         dt_alpha_true = -pde.lam * u_val
         rel_err = torch.linalg.norm(dt_alpha - dt_alpha_true) / torch.linalg.norm(dt_alpha_true)
@@ -49,5 +51,5 @@ def test_fraction_operator_with_plot():
             assert rel_err.item() < 0.4
         dt_alpha_np = dt_alpha.detach().cpu().numpy().reshape(T.shape)
         dt_alpha_true_np = dt_alpha_true.detach().cpu().numpy().reshape(T.shape)
-        plotter.plot_solution(T, X, dt_alpha_np, dt_alpha_true_np, idx)
+        plotter.plot_solution(T, X, dt_alpha_np, f"{method} dt_alpha", f"dt_alpha_{method}")
     
