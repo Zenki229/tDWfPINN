@@ -52,7 +52,7 @@ def get_config():
     config.cuda_dev = '0' # Default on cuda:0
     config.training = training = ml_collections.ConfigDict()
     training.max_steps = 3
-    training.nums = (5000,1000,1000)
+    training.batch = {'in':5000, 'bd':1000, 'init':1000}
     # RAD setting
     config.RAD = RAD = ml_collections.ConfigDict() 
     RAD.use = False

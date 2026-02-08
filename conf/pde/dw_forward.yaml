@@ -5,10 +5,10 @@ lambda_val: 1.0
 x_lim: [0, 1]
 t_lim: [0, 2]
 method: "GJ-II"
-mc_params:
+monte_carlo_params:
   nums: 50
   eps: 1e-10
-gj_params:
+gauss_jacobi_params:
   nums: 1000
 weights:
   domain: 1.0

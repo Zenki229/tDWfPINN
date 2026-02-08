@@ -213,9 +213,10 @@ class DWForward(PINN):
         x = points[:, 1:2] #N*1
         part1 = np.sin(self.k*np.pi*x) #N*1 
         part2 = self.a*self.mitlef(self.al, 1.0, -self.lam*np.power(t,self.al)) + self.b*t*self.mitlef(self.al, 2.0, -self.lam*np.power(t,self.al)) #N*1
-        return part1*part2 #N*1
+        return part1* part2 #N*1
     def evaluator(self, net, count):
         config = self.config
+        plt.rcParams.update({'font.size': 14})
         t = np.linspace(config.tlim[0],config.tlim[1], 256)
         x = np.linspace(config.xlim[0][0], config.xlim[0][1], 256)
         mesh_t, mesh_x = np.meshgrid(t,x)
@@ -255,6 +256,7 @@ class DWForward(PINN):
         return err 
         
     def rad_plot(self, points, rad_points, path_save, count):
+        plt.rcParams.update({'font.size': 14})
         ts,te,xs,xe = self.tlim[0], self.tlim[1], self.xlim[0][0], self.xlim[0][1]
         fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
         ax.set_xlim(ts - (te - ts) * 0.05, te + (te - ts) * 0.20)

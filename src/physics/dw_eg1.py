@@ -5,20 +5,20 @@ from src.physics.fractional import mitlef
 from src.utils.typing import Tensor, Dict, Any
 from omegaconf import DictConfig
 
-class DWForward(TimeFracCaputoDiffusionWaveTwoDimPDE):
+class DWForwardEg1(TimeFracCaputoDiffusionWaveTwoDimPDE):
     """
     DWForward PDE problem implementation.
     
-    Solves fractional diffusion-wave equation.
+    Solves fractional diffusion-wave equation for example 1.
     """
     def __init__(self, cfg: DictConfig, device: torch.device):
-        super().__init__(cfg, device, cfg.pde.alpha)
-        self.k = cfg.pde.k
-        self.lam = cfg.pde.lambda_val
-        self.x_lim = cfg.pde.x_lim
-        self.t_lim = cfg.pde.t_lim
-        self.a = getattr(cfg.pde, 'a', 1.0)
-        self.b = getattr(cfg.pde, 'b', 1.0)
+        super().__init__(cfg, device, 1.5)
+        self.k = 1.0
+        self.lam = np.power(np.pi, 2)
+        self.x_lim = [0, 1.0]
+        self.t_lim = [0, 1.0]
+        self.a = 2.0
+        self.b = -1.0
 
     def residual(self, net: torch.nn.Module, points_all: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         losses = {}

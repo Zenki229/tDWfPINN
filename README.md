@@ -1,13 +1,22 @@
 # tDWfPINN: Transformed Diffusion-Waved Fractional PINNs
 
-Refactored professional codebase for solving fractional PINNs using **Hydra** (Configuration), **Weights & Biases** (Experiment Tracking), and **Plotly** (Interactive Visualization).
+Refactored professional codebase for solving fractional PINNs using **Hydra** (Configuration), **Weights & Biases** (Experiment Tracking), and **Plotly** (Interactive Visualization). See Paper here. 📄 <a href="https://arxiv.org/abs/2506.11518">Paper</a> 
 
+## TODO 
+1. **[FINISH]** add unit-test for computing **MC-I, MC-II, GJ-I, GJ-II** for PDEs.
+2. Improving plotting
+3. In the future, we will update the code to JAX.
 ## 🚀 Features
 - **Hierarchical Configuration**: Manage experiments via `conf/` using Hydra.
 - **Experiment Tracking**: Automatic logging of metrics, gradients, and artifacts to WandB.
 - **Interactive Visualization**: Heatmaps and scatter plots with Plotly, saving raw data for reproducibility.
 - **Modular Design**: Strict separation of Physics, Model, Data, and Training logic.
 - **Reproducibility**: Global seeding and explicit version control logging.
+  
+## Development Log 
+### 0206
+- add unit-test for computing **MC-I, MC-II, GJ-I, GJ-II** for PDEs in `tests/`. Use `self.exact` and `self.exact_dt` as the value and 1st derivative of the exact solution. 
+- Improve `plotly` and `matplotlib` as the backend for visualization. Plot single figure. 
 
 ## 📂 Directory Structure
 ```

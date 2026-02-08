@@ -1,26 +1,19 @@
 import os
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from typing import Dict, Any, Optional
-import json
+import matplotlib.pyplot as plt
+from typing import Dict, Optional
+from omegaconf import DictConfig
 import logging
 
 log = logging.getLogger(__name__)
 
-class Plotter:
-    def __init__(self, save_dir: str):
-        """
-        Initialize the Plotter.
-        
-        Args:
-            save_dir (str): Base directory for saving results.
-        """
+class BasePlotter:
+    def __init__(self, save_dir: str, cfg: Optional[DictConfig] = None):
+        self.cfg = cfg
         self.save_dir = os.path.join(save_dir, "results")
         self.raw_dir = os.path.join(self.save_dir, "raw_data")
         self.img_dir = os.path.join(self.save_dir, "plots")
-        
-        # Ensure directories exist
         try:
             os.makedirs(self.raw_dir, exist_ok=True)
             os.makedirs(self.img_dir, exist_ok=True)
@@ -30,9 +23,6 @@ class Plotter:
             raise e
 
     def save_state(self, name: str, data: Dict[str, np.ndarray]):
-        """
-        Save raw plotting data to NPZ.
-        """
         path = os.path.join(self.raw_dir, f"{name}.npz")
         try:
             np.savez_compressed(path, **data)
@@ -40,73 +30,128 @@ class Plotter:
         except Exception as e:
             log.error(f"Failed to save raw data to {path}: {e}")
 
+    def _resolve_font_size(self, font_size: Optional[int]) -> int:
+        if font_size is not None:
+            return int(font_size)
+        if self.cfg is not None and hasattr(self.cfg, "plot") and hasattr(self.cfg.plot, "font_size"):
+            return int(self.cfg.plot.font_size)
+        return 14
+
+    def _jpg_enabled(self) -> bool:
+        if self.cfg is not None and hasattr(self.cfg, "plot") and hasattr(self.cfg.plot, "jpg"):
+            return bool(self.cfg.plot.jpg)
+        return True
+
+    def _resolve_dpi(self) -> int:
+        if self.cfg is not None and hasattr(self.cfg, "plot") and hasattr(self.cfg.plot, "dpi"):
+            return int(self.cfg.plot.dpi)
+        return 100
+
+
+class PlotlyPlotter(BasePlotter):
     def _save_figure(self, fig: go.Figure, filename_base: str):
-        """
-        Helper to save figure as HTML and JPG.
-        """
-        # Save HTML
         html_path = os.path.join(self.img_dir, f"{filename_base}.html")
         try:
             fig.write_html(html_path)
             log.info(f"Saved HTML plot to {html_path}")
         except Exception as e:
             log.error(f"Failed to save HTML plot to {html_path}: {e}")
+        if self._jpg_enabled():
+            jpg_path = os.path.join(self.img_dir, f"{filename_base}.jpg")
+            fig.write_image(jpg_path)
 
-        # Save JPG
-        jpg_path = os.path.join(self.img_dir, f"{filename_base}.jpg")
-        try:
-            # Use kaleido for static image export
-            fig.write_image(jpg_path, format="jpg", engine="kaleido")
-            log.info(f"Saved JPG plot to {jpg_path}")
-        except Exception as e:
-            log.error(f"Failed to save JPG plot to {jpg_path}: {e}")
-            # Fallback warning if kaleido is missing/broken
-            log.warning("Ensure 'kaleido' is installed for static image export.")
+    def plot_solution(
+        self,
+        t: np.ndarray,
+        x: np.ndarray,
+        values: np.ndarray,
+        title: str,
+        name: Optional[str] = None,
+        font_size: Optional[int] = None
+    ):
+        if name is None:
+            name = title.strip().lower().replace(" ", "_").replace("/", "_").replace("\\", "_")
+            if not name:
+                name = "plot"
 
-    def plot_solution(self, t: np.ndarray, x: np.ndarray, 
-                      u_pred: np.ndarray, u_exact: np.ndarray, 
-                      epoch: int):
-        """
-        Plot solution heatmap comparison.
-        t, x are meshgrids.
-        """
-        err = np.abs(u_pred - u_exact)
-        name = f"solution_epoch_{epoch}"
-        
-        # Save raw data first
-        self.save_state(name, {
-            "t": t, "x": x, "u_pred": u_pred, "u_exact": u_exact, "error": err
-        })
+        self.save_state(name, {"t": t, "x": x, "values": values})
 
-        # Create Plotly figure
-        # 1x3 subplots: Pred, Exact, Error
-        fig = make_subplots(rows=1, cols=3, 
-                            subplot_titles=("Prediction", "Exact", "Abs Error"),
-                            shared_yaxes=True)
+        fig = go.Figure()
+        fig.add_trace(
+            go.Heatmap(
+                z=values,
+                x=t[0],
+                y=x[:, 0],
+                colorscale="Jet",
+                zsmooth="best",
+                colorbar=dict(tickformat=".1e", thickness=18)
+            )
+        )
+        font_size = self._resolve_font_size(font_size)
 
-        # Prediction
-        fig.add_trace(go.Heatmap(z=u_pred, x=t[0], y=x[:,0], colorscale='Viridis', colorbar=dict(len=0.3, y=0.8)), row=1, col=1)
-        
-        # Exact
-        fig.add_trace(go.Heatmap(z=u_exact, x=t[0], y=x[:,0], colorscale='Viridis', colorbar=dict(len=0.3, y=0.5)), row=1, col=2)
-        
-        # Error
-        fig.add_trace(go.Heatmap(z=err, x=t[0], y=x[:,0], colorscale='Plasma', colorbar=dict(len=0.3, y=0.2)), row=1, col=3)
+        fig.update_layout(
+            title_text=title,
+            width=640,
+            template="simple_white",
+            xaxis_title="t",
+            yaxis_title="x",
+            margin=dict(l=60, r=40, t=60, b=60),
+            font=dict(size=font_size),
+            title_font=dict(size=font_size + 2)
+        )
+        fig.update_yaxes(scaleanchor="x")
 
-        fig.update_layout(title_text=f"Epoch {epoch} Solution Analysis", height=500, width=1500)
-        
         self._save_figure(fig, name)
 
     def plot_scatter(self, points: np.ndarray, name: str, epoch: int):
-        """
-        Scatter plot for RAD points.
-        points: N*2 [t, x]
-        """
         filename_base = f"{name}_epoch_{epoch}"
         self.save_state(filename_base, {"points": points})
-        
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=points[:, 0], y=points[:, 1], mode='markers', marker=dict(size=2, color='red')))
         fig.update_layout(title=f"{name} Points at Epoch {epoch}", xaxis_title="t", yaxis_title="x")
-        
         self._save_figure(fig, filename_base)
+
+
+class PltPlotter(BasePlotter):
+    def plot_solution(
+        self,
+        t: np.ndarray,
+        x: np.ndarray,
+        values: np.ndarray,
+        title: str,
+        name: Optional[str] = None,
+        font_size: Optional[int] = None
+    ):
+        if name is None:
+            name = title.strip().lower().replace(" ", "_").replace("/", "_").replace("\\", "_")
+            if not name:
+                name = "plot"
+
+        self.save_state(name, {"t": t, "x": x, "values": values})
+
+        font_size = self._resolve_font_size(font_size)
+        plt.rcParams.update({'font.size': font_size})
+        fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
+        plot = ax.pcolormesh(t, x, values, shading='gouraud', cmap='jet')
+        fig.colorbar(plot, ax=ax, format="%1.1e")
+        ax.set_title(title)
+        ax.set_xlabel('t')
+        ax.set_ylabel('x')
+        if self._jpg_enabled():
+            jpg_path = os.path.join(self.img_dir, f"{name}.jpg")
+            fig.savefig(jpg_path, dpi=self._resolve_dpi())
+        plt.close(fig)
+
+    def plot_scatter(self, points: np.ndarray, name: str, epoch: int):
+        filename_base = f"{name}_epoch_{epoch}"
+        self.save_state(filename_base, {"points": points})
+        font_size = self._resolve_font_size(None)
+        plt.rcParams.update({'font.size': font_size})
+        fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
+        ax.scatter(points[:, 0], points[:, 1], c='r', marker='.', s=np.ones_like(points[:, 0]), alpha=1.0)
+        ax.set_xlabel('t')
+        ax.set_ylabel('x')
+        if self._jpg_enabled():
+            jpg_path = os.path.join(self.img_dir, f"{filename_base}.jpg")
+            fig.savefig(jpg_path, dpi=self._resolve_dpi())
+        plt.close(fig)

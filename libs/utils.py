@@ -54,6 +54,7 @@ def loss_plot(path):
     plt.savefig(path+'/train'+'/loss_plot.jpg', dpi=150)
     plt.close()
 def loss_err_plot(path):
+    plt.rcParams.update({'font.size': 14})
     count = 0
     loss = []
     err = []
