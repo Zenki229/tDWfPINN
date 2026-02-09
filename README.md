@@ -4,7 +4,7 @@ Refactored professional codebase for solving fractional PINNs using **Hydra** (C
 
 ## TODO 
 1. **[FINISH]** add unit-test for computing **MC-I, MC-II, GJ-I, GJ-II** for PDEs.
-2. Improving plotting
+2. **[FINISH]** Improving plotting
 3. In the future, we will update the code to JAX.
 ## 🚀 Features
 - **Hierarchical Configuration**: Manage experiments via `conf/` using Hydra.
@@ -42,7 +42,7 @@ pip install -r requirements.txt
 ```
 
 ## 🏃 Usage
-
+All running scripts are in `scripts/`. 
 ### Basic Training
 ```bash
 python src/train.py

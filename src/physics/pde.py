@@ -27,11 +27,11 @@ class PDE(nn.Module):
         pass 
 
 class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
-    def __init__(self, cfg: DictConfig, device: torch.device, alpha: float):
+    def __init__(self, cfg: DictConfig, device: torch.device):
         super().__init__()
         self.cfg = cfg
         self.device = device
-        self.alpha = float(alpha)
+        self.alpha = cfg.pde.alpha
         self.method = cfg.pde.method
         if 'GJ' in self.method:
             nums = cfg.pde.gj_params.nums

@@ -8,7 +8,7 @@ from src.utils.typing import Tensor, Dict
 
 class BurgersPDE(TimeFracCaputoDiffusionWaveTwoDimPDE):
     def __init__(self, cfg: DictConfig, device: torch.device):
-        super().__init__(cfg, device, cfg.pde.alpha)
+        super().__init__(cfg, device)
         self.beta = cfg.pde.beta
         self.nu = getattr(cfg.pde, "nu", 0.01 / np.pi)
         self.datafile = getattr(cfg.pde, "datafile", None)

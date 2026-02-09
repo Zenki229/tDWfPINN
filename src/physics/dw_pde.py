@@ -12,7 +12,7 @@ class DWForward(TimeFracCaputoDiffusionWaveTwoDimPDE):
     Solves fractional diffusion-wave equation.
     """
     def __init__(self, cfg: DictConfig, device: torch.device):
-        super().__init__(cfg, device, cfg.pde.alpha)
+        super().__init__(cfg, device)
         self.k = cfg.pde.k
         self.lam = cfg.pde.lambda_val
         self.x_lim = cfg.pde.x_lim

@@ -134,7 +134,8 @@ class PltPlotter(BasePlotter):
         fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
         plot = ax.pcolormesh(t, x, values, shading='gouraud', cmap='jet')
         fig.colorbar(plot, ax=ax, format="%1.1e")
-        ax.set_title(title)
+        if title: # if title is null, do not plot title
+            ax.set_title(title)
         ax.set_xlabel('t')
         ax.set_ylabel('x')
         if self._jpg_enabled():
@@ -142,13 +143,23 @@ class PltPlotter(BasePlotter):
             fig.savefig(jpg_path, dpi=self._resolve_dpi())
         plt.close(fig)
 
-    def plot_scatter(self, points: np.ndarray, name: str, epoch: int):
+    def plot_scatter(self, points: np.ndarray, rad_points: np.ndarray, t_lim: list, x_lim: list, name: str, epoch: int):
         filename_base = f"{name}_epoch_{epoch}"
-        self.save_state(filename_base, {"points": points})
+        self.save_state(filename_base, {"points": points, "rad_points": rad_points})
         font_size = self._resolve_font_size(None)
         plt.rcParams.update({'font.size': font_size})
+        
+        ts, te = t_lim[0], t_lim[1]
+        xs, xe = x_lim[0], x_lim[1]
+        
         fig, ax = plt.subplots(layout='constrained', figsize=(6.4, 4.8))
-        ax.scatter(points[:, 0], points[:, 1], c='r', marker='.', s=np.ones_like(points[:, 0]), alpha=1.0)
+        ax.set_xlim(ts - (te - ts) * 0.05, te + (te - ts) * 0.20)
+        ax.set_ylim(xs - (xe - xs) * 0.05, xe + (xe - xs) * 0.20)
+        
+        ax.scatter(points[:, 0], points[:, 1], c='b', marker='.', s=np.ones_like(points[:, 0]), alpha=0.3, label='uni')
+        ax.scatter(rad_points[:, 0], rad_points[:, 1], c='r', marker='.', s=np.ones_like(rad_points[:, 0]), alpha=1.0, label='RAD')
+        
+        ax.legend(loc='upper right')
         ax.set_xlabel('t')
         ax.set_ylabel('x')
         if self._jpg_enabled():

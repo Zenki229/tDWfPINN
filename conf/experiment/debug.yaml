@@ -8,9 +8,9 @@ model:
   num_layers: 2
 
 optimizer:
-  epochs: 400
+  epochs: 10
   lbfgs:
-    use: false
+    use: True
 
 trainer:
   max_steps: 2
@@ -18,9 +18,16 @@ trainer:
     domain: 100
     boundary: 10
     initial: 10
+  rad:
+    use: true
+    ratio: 0.8
+    batch:
+      domain: 1000
+      boundary: 2
+      initial: 2
 
 wandb:
-  project: "tDWfPINN-debug"
+  project: "tDWfPINN-debug-eg1"
   entity: null
-  mode: "disabled" # Default to disabled for dev, user can enable
+  mode: "online" # Default to disabled for dev, user can enable
   group: null
