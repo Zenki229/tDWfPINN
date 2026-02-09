@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 **/results/
 **/outputs/
+.trae/ 
+.vscode/
 # for Latex Extensions
 *.aux
 *.log
