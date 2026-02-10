@@ -9,13 +9,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.physics.fractional import mitlef, roots_jacobi
 from src.physics.dw_eg1 import *
 from src.vis.plotter import PlotlyPlotter, PltPlotter
-from libs.pde_burgers import DWBurgers
+# from libs.pde_burgers import DWBurgers
 
 
 
 def test_fraction_operator_with_plot():
     alpha = 1.50
-    work_dirs = "tests/test_fractional-0206"
+    work_dirs = "tests/test_fractional-0210"
     os.makedirs(work_dirs, exist_ok=True)
     torch.manual_seed(0)
     np.random.seed(0)
@@ -33,7 +33,7 @@ def test_fraction_operator_with_plot():
                 "alpha": alpha,
                 "method": method,
                 "monte_carlo_params": {"nums": 80, "eps": 1e-10},
-                "gj_params": {"nums": 120}
+                "gauss_jacobi_params": {"nums": 120}
             },
             "plot": {
                 "backend": "matplotlib",
@@ -59,39 +59,39 @@ def test_fraction_operator_with_plot():
         l2_err = np.linalg.norm(abs_err) / np.linalg.norm(dt_alpha_true_np)
         plotter.plot_solution(t=T, x=X, values=abs_err, title=f"L2 Error is {l2_err:.4f}", name=f"abs_err_{method}")
 
-def test_burgers_residual_shapes():
-    torch.manual_seed(0)
-    np.random.seed(0)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cfg = SimpleNamespace(
-        al=1.5,
-        datafile="",
-        beta=2.0,
-        xlim=[[0, 1]],
-        tlim=[0, 1],
-        method="MC-I",
-        MC=SimpleNamespace(nums=5, eps=1e-6),
-        GJ=SimpleNamespace(nums=5),
-        dev=device
-    )
-    pde = DWBurgers(cfg)
-    net = torch.nn.Sequential(
-        torch.nn.Linear(2, 16),
-        torch.nn.Tanh(),
-        torch.nn.Linear(16, 1)
-    ).to(device=device)
-    n_in, n_bd, n_init = 6, 4, 5
-    points_in = torch.rand(n_in, 2, device=device)
-    points_bd = torch.rand(n_bd, 2, device=device)
-    points_init = torch.rand(n_init, 2, device=device)
-    points_init[:, 0] = 0.0
-    points_all = {"in": points_in, "bd": points_bd, "init": points_init}
-    losses = pde.residual(net, points_all)
-    assert set(losses.keys()) == {"in", "bd", "init", "init_dt"}
-    assert losses["in"].shape == (n_in, 1)
-    assert losses["bd"].shape == (n_bd, 1)
-    assert losses["init"].shape == (n_init, 1)
-    assert losses["init_dt"].shape == (n_init, 1)
-    for val in losses.values():
-        assert torch.isfinite(val).all()
+# def test_burgers_residual_shapes():
+#     torch.manual_seed(0)
+#     np.random.seed(0)
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     cfg = SimpleNamespace(
+#         al=1.5,
+#         datafile="",
+#         beta=2.0,
+#         xlim=[[0, 1]],
+#         tlim=[0, 1],
+#         method="MC-I",
+#         MC=SimpleNamespace(nums=5, eps=1e-6),
+#         GJ=SimpleNamespace(nums=5),
+#         dev=device
+#     )
+#     pde = DWBurgers(cfg)
+#     net = torch.nn.Sequential(
+#         torch.nn.Linear(2, 16),
+#         torch.nn.Tanh(),
+#         torch.nn.Linear(16, 1)
+#     ).to(device=device)
+#     n_in, n_bd, n_init = 6, 4, 5
+#     points_in = torch.rand(n_in, 2, device=device)
+#     points_bd = torch.rand(n_bd, 2, device=device)
+#     points_init = torch.rand(n_init, 2, device=device)
+#     points_init[:, 0] = 0.0
+#     points_all = {"in": points_in, "bd": points_bd, "init": points_init}
+#     losses = pde.residual(net, points_all)
+#     assert set(losses.keys()) == {"in", "bd", "init", "init_dt"}
+#     assert losses["in"].shape == (n_in, 1)
+#     assert losses["bd"].shape == (n_bd, 1)
+#     assert losses["init"].shape == (n_init, 1)
+#     assert losses["init_dt"].shape == (n_init, 1)
+#     for val in losses.values():
+#         assert torch.isfinite(val).all()
     

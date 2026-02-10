@@ -2,7 +2,7 @@
 
 # the script for running the debug example 1, for example 1, some configs are configured at the __init__ method.
 ALPHA=1.25 
-method='MC-I'
+method='GJ-I'
 plot_backend='matplotlib'
 
 

@@ -9,7 +9,7 @@ monte_carlo_params:
   nums: 50
   eps: 1e-10
 gauss_jacobi_params:
-  nums: 1000
+  nums: 64
 weights:
   domain: 1.0
   boundary: 1.0

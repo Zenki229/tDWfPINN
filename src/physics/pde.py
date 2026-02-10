@@ -34,7 +34,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         self.alpha = cfg.pde.alpha
         self.method = cfg.pde.method
         if 'GJ' in self.method:
-            nums = cfg.pde.gj_params.nums
+            nums = cfg.pde.gauss_jacobi_params.nums
             quad_t, quad_wt = roots_jacobi(nums, 0, 1 - self.alpha)
             self.quad_t = (quad_t + 1) / 2
             self.quad_w = quad_wt * (1 / 2) ** (2 - self.alpha)
@@ -156,7 +156,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
 
     def _gj_i(self, net: nn.Module, points: torch.Tensor, dt: torch.Tensor) -> torch.Tensor:
         alpha = self.alpha
-        nums = self.cfg.pde.gj_params.nums
+        nums = self.cfg.pde.gauss_jacobi_params.nums
         num_points = len(points)
         taus = torch.from_numpy(self.quad_t).to(self.device).float()
         quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
@@ -199,7 +199,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
     def _gj_ii(self, net: nn.Module, points: torch.Tensor, val: torch.Tensor, dt: torch.Tensor) -> torch.Tensor:
         alpha = self.alpha
         coeff_for_frac_dt = sp.gamma(2 - alpha)
-        nums = self.cfg.pde.gj_params.nums
+        nums = self.cfg.pde.gauss_jacobi_params.nums
         num_points = len(points)
         taus = torch.from_numpy(self.quad_t).to(self.device).float()
         quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
@@ -303,7 +303,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
             return dt_alpha
         if self.method == 'GJ-I':
             alpha = self.alpha
-            nums = self.cfg.pde.gj_params.nums
+            nums = self.cfg.pde.gauss_jacobi_params.nums
             num_points = len(points)
             taus = torch.from_numpy(self.quad_t).to(self.device).float()
             quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
@@ -326,7 +326,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         if self.method == 'GJ-II':
             alpha = self.alpha
             coeff_for_frac_dt = sp.gamma(2 - alpha)
-            nums = self.cfg.pde.gj_params.nums
+            nums = self.cfg.pde.gauss_jacobi_params.nums
             num_points = len(points)
             taus = torch.from_numpy(self.quad_t).to(self.device).float()
             quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
