@@ -35,6 +35,7 @@ def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> wandb.run:
     """
     run = wandb.init(
         project=cfg.wandb.project,
+        name=cfg.wandb.name,
         entity=cfg.wandb.entity,
         group=cfg.wandb.group,
         mode=cfg.wandb.mode,

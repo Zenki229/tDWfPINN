@@ -14,4 +14,5 @@ python src/train.py \
     pde.alpha=${ALPHA} \
     pde.method=${method} \
     wandb.project="debug-eg1" \
+    wandb.name=${method} \
     plot=${plot_backend} 

@@ -1,7 +1,7 @@
 # @package _global_
 hydra:
   run:
-    dir: outputs/debug/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/${wandb.project}-${wandb.name}/${now:%Y-%m-%d_%H-%M-%S}
 
 model:
   hidden_dim: 2
@@ -30,4 +30,5 @@ wandb:
   project: "tDWfPINN-debug-eg1"
   entity: null
   mode: "online" # Default to disabled for dev, user can enable
+  name: "eg1-MC-I"
   group: null

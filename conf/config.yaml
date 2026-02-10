@@ -10,12 +10,13 @@ hydra:
   job:
     chdir: true
   run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/${wandb.project}-${wandb.name}/${now:%Y-%m-%d_%H-%M-%S}
 
 wandb:
   project: "tDWfPINN"
   entity: null
   mode: "disabled" # Default to disabled for dev, user can enable
+  name: ${pde.method}
   group: null
 
 seed: 42
