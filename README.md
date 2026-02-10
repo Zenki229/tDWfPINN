@@ -9,14 +9,10 @@ Refactored professional codebase for solving fractional PINNs using **Hydra** (C
 ## 🚀 Features
 - **Hierarchical Configuration**: Manage experiments via `conf/` using Hydra.
 - **Experiment Tracking**: Automatic logging of metrics, gradients, and artifacts to WandB.
-- **Interactive Visualization**: Heatmaps and scatter plots with Plotly, saving raw data for reproducibility.
+- **Interactive Visualization**: Heatmaps and scatter plots with Plotly OR MatPlotLib, saving raw data for reproducibility.
 - **Modular Design**: Strict separation of Physics, Model, Data, and Training logic.
 - **Reproducibility**: Global seeding and explicit version control logging.
   
-## Development Log 
-### 0206
-- add unit-test for computing **MC-I, MC-II, GJ-I, GJ-II** for PDEs in `tests/`. Use `self.exact` and `self.exact_dt` as the value and 1st derivative of the exact solution. 
-- Improve `plotly` and `matplotlib` as the backend for visualization. Plot single figure. 
 
 ## 📂 Directory Structure
 ```
@@ -25,7 +21,9 @@ tDWfPINN/
 │   ├── config.yaml    # Main config
 │   ├── model/         # Architecture settings
 │   ├── pde/           # Physics parameters
-│   └── experiment/    # Reproducible presets
+│   ├── optimizer/     # Optimizer settings
+│   ├── plot/          # Plotting settings
+│   └── experiment/    # Debug presets
 ├── src/               # Source Code
 │   ├── data/          # Samplers (TimeSpaceSampler)
 │   ├── models/        # Neural Networks (MLP)
@@ -42,37 +40,21 @@ pip install -r requirements.txt
 ```
 
 ## 🏃 Usage
-All running scripts are in `scripts/`. 
-### Basic Training
-```bash
-python src/train.py
-```
-
+All running scripts are in `scripts/`. You must preset the `wandb` setting before training.
 ### Debug Mode (Fast Run)
 ```bash
-python src/train.py experiment=debug
+bash scripts/run_debug_eg1.sh
 ```
 
-### Overriding Parameters (Hydra Syntax)
+### EG1
 ```bash
-# Change learning rate and max steps
-python src/train.py optimizer.lr=0.005 training.max_steps=5000
-
-# Change PDE alpha
-python src/train.py pde.alpha=1.5
+bash scripts/run_eg1.sh
 ```
 
 ## 📊 Output
 - **Logs**: WandB dashboard (online or offline).
-- **Checkpoints**: Saved in `outputs/YYYY-MM-DD/HH-MM-SS/`.
-- **Plots**: Interactive HTML and raw `.npz` data in `outputs/.../plots/` and `raw_data/`.
-
-## 📐 Mathematical Notation
-| Symbol | Meaning | Code Variable |
-| :--- | :--- | :--- |
-| $\alpha$ | Fractional Order | `pde.alpha` |
-| $\lambda$ | Diffusion Coefficient | `pde.lambda_val` |
-| $N$ | Batch Size (Domain) | `training.batch_size.domain` |
+- **Checkpoints**: Saved in `outputs/${wandb.project}-${wandb.name}/${now:%Y-%m-%d_%H-%M-%S}/`.
+- **Plots**: Interactive HTML(plotly) or JPG and raw `.npz` data in the same output directory under `plots/` and `raw_data/`.
 
 ## 🧪 Testing
 ```bash

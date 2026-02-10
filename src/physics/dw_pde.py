@@ -18,7 +18,7 @@ class DWForward(TimeFracCaputoDiffusionWaveTwoDimPDE):
         self.x_lim = cfg.pde.x_lim
         self.t_lim = cfg.pde.t_lim
         self.a = getattr(cfg.pde, 'a', 1.0)
-        self.b = getattr(cfg.pde, 'b', 1.0)
+        self.b = getattr(cfg.pde, 'b', -0.5)
 
     def residual(self, net: torch.nn.Module, points_all: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         losses = {}
