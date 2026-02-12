@@ -1,4 +1,5 @@
 import hydra
+from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 import torch
 import torch.optim as optim
@@ -8,6 +9,8 @@ import logging
 from tqdm import tqdm
 import time
 import wandb
+import sys 
+
 
 from src.utils.experiments import set_seed, setup_wandb
 from src.models.net import MLP
@@ -230,10 +233,14 @@ class Trainer:
         with torch.no_grad():
             # Create mesh
             # Assume 1D spatial for plotting
-            t_eval = np.linspace(self.cfg.pde.t_lim[0], self.cfg.pde.t_lim[1], 100)
-            x_eval = np.linspace(self.cfg.pde.x_lim[0], self.cfg.pde.x_lim[1], 100)
-            T, X = np.meshgrid(t_eval, x_eval)
+            if self.pde.__class__.__name__ == "BurgersPDE": 
+                t_eval = self.pde.data['t']
+                x_eval = self.pde.data['x']
+            else:
+                t_eval = np.linspace(self.cfg.pde.t_lim[0], self.cfg.pde.t_lim[1], 100)
+                x_eval = np.linspace(self.cfg.pde.x_lim[0], self.cfg.pde.x_lim[1], 100)
             
+            T, X = np.meshgrid(t_eval, x_eval)    
             points_np = np.stack([T.flatten(), X.flatten()], axis=1)
             points_tensor = torch.from_numpy(points_np).to(dtype=torch.get_default_dtype(), device=self.device)
             

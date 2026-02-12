@@ -7,7 +7,7 @@ rad:
   use: true
   ratio: 0.8
   batch:
-    domain: 1000
+    domain: 10000
     boundary: 2
     initial: 2
 

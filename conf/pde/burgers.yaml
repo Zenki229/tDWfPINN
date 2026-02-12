@@ -1,0 +1,17 @@
+_target_: src.physics.burgers_pde.BurgersPDE
+alpha: 1.1
+method: "GJ-II"
+x_lim: [-1, 1]
+t_lim: [0, 1]
+beta: 1.0
+datafile: null
+monte_carlo_params:
+  nums: 50
+  eps: 1e-10
+gauss_jacobi_params:
+  nums: 10
+weights:
+  domain: 1.0
+  boundary: 100.0
+  initial: 100.0
+  initial_dt: 100.0

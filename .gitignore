@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 **/results/
 **/outputs/
+**/burgers_data_gen
 .trae/ 
 .vscode/
 # for Latex Extensions

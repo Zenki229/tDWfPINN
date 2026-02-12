@@ -164,5 +164,5 @@ class PltPlotter(BasePlotter):
         ax.set_ylabel('x')
         if self._jpg_enabled():
             jpg_path = os.path.join(self.img_dir, f"{filename_base}.jpg")
-            fig.savefig(jpg_path, dpi=self._resolve_dpi())
+            fig.savefig(jpg_path, dpi=300)
         plt.close(fig)

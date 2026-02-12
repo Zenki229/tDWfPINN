@@ -29,6 +29,6 @@ trainer:
 wandb:
   project: "tDWfPINN-debug-eg1"
   entity: null
-  mode: "online" # Default to disabled for dev, user can enable
+  mode: "disabled" # Default to disabled for dev, user can enable
   name: "eg1-MC-I"
   group: null
