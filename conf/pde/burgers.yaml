@@ -1,8 +1,8 @@
 name: debug_eg1
 al: 1.5
 beta: 2.0
-xlim: [[0, 1]]
-tlim: [0, 1]
+xlim: [[-1, 1]]
+tlim: [0, 1.2]
 method: GJ-II
 MC:
   nums: 50

@@ -1,0 +1,267 @@
+% Standalone LaTeX section for the revised tDWfPINNs manuscript.
+% This file can be compiled as a standalone document, or the section body can be
+% copied into the numerical-experiments section of the paper.
+
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\newcommand{\Dtalpha}{\partial_t^\alpha}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bb}{\bm b}
+\newcommand{\grad}{\nabla}
+
+\begin{document}
+
+\section{Two-dimensional nonlinear heterogeneous diffusion-wave equation on an irregular domain}
+\label{sec:irregular-2d-dw}
+
+To further assess the proposed transformed diffusion-wave fPINN formulation in a genuinely multidimensional and geometrically nontrivial setting, we consider a two-dimensional nonlinear heterogeneous time-fractional diffusion-wave equation on an irregular domain. This example is designed to test four aspects that are not visible in one-dimensional benchmark problems: multidimensionality, a non-rectangular geometry, spatially heterogeneous diffusion, and nonlinear interaction.
+
+Let $T=1$ and let $1<\alpha<2$. The spatial domain is a square with an off-center circular hole,
+\begin{equation}
+\Omega=
+(-1,1)^2\setminus \overline{B_{r_0}(c)},
+\qquad
+c=(-0.3,0.2),
+\qquad
+r_0=0.25,
+\label{eq:irregular-domain}
+\end{equation}
+where
+\[
+B_{r_0}(c)=\left\{(x,y)\in\R^2:(x+0.3)^2+(y-0.2)^2<r_0^2\right\}.
+\]
+We solve
+\begin{equation}
+\Dtalpha u
+-
+\grad\cdot\left(a(x,y)\grad u\right)
++
+\bb(x,y)\cdot\grad u
++
+\lambda u^3
+=
+f(t,x,y),
+\qquad
+(t,x,y)\in(0,T]\times\Omega,
+\label{eq:irregular-2d-pde}
+\end{equation}
+with homogeneous Dirichlet boundary conditions and homogeneous initial conditions,
+\begin{equation}
+ u(t,x,y)=0,
+\qquad
+(t,x,y)\in(0,T]\times\partial\Omega,
+\label{eq:irregular-2d-bc}
+\end{equation}
+\begin{equation}
+ u(0,x,y)=0,
+\qquad
+ \partial_t u(0,x,y)=0,
+\qquad
+(x,y)\in\Omega.
+\label{eq:irregular-2d-ic}
+\end{equation}
+The heterogeneous diffusion coefficient, convection field, and nonlinear coefficient are chosen as
+\begin{equation}
+ a(x,y)=1+0.3\sin(\pi x)\cos(\pi y),
+\qquad
+ \bb(x,y)=\begin{pmatrix}1+y\\ x-1\end{pmatrix},
+\qquad
+ \lambda=1.
+\label{eq:irregular-2d-coefficients}
+\end{equation}
+The diffusion coefficient satisfies
+\[
+0.7\leq a(x,y)\leq 1.3,
+\]
+so the elliptic part remains uniformly positive.
+
+\subsection{Manufactured exact solution and source term}
+
+We use the manufactured exact solution
+\begin{equation}
+ u^\ast(t,x,y)=q(t)\phi(x,y),
+\qquad
+ q(t)=t^2(1-t)^2,
+\label{eq:irregular-2d-exact}
+\end{equation}
+where
+\begin{equation}
+ \phi(x,y)
+ =
+ (1-x^2)(1-y^2)
+ \left((x+0.3)^2+(y-0.2)^2-r_0^2\right).
+\label{eq:irregular-2d-phi}
+\end{equation}
+This construction enforces homogeneous boundary conditions on both parts of the boundary. Indeed, $(1-x^2)(1-y^2)=0$ on the outer square boundary $x=\pm1$ or $y=\pm1$, while
+\[
+(x+0.3)^2+(y-0.2)^2-r_0^2=0
+\]
+on the inner circular boundary. Moreover, since $q(0)=q'(0)=0$, the initial conditions in \eqref{eq:irregular-2d-ic} are also satisfied.
+
+The temporal Caputo derivative is available in closed form. Since
+\[
+q(t)=t^2-2t^3+t^4,
+\]
+we have, for $1<\alpha<2$,
+\begin{equation}
+ \Dtalpha q(t)
+ =
+ \frac{2}{\Gamma(3-\alpha)}t^{2-\alpha}
+ -
+ \frac{12}{\Gamma(4-\alpha)}t^{3-\alpha}
+ +
+ \frac{24}{\Gamma(5-\alpha)}t^{4-\alpha}.
+\label{eq:irregular-2d-caputo-q}
+\end{equation}
+Thus
+\begin{equation}
+ \Dtalpha u^\ast(t,x,y)=\left(\Dtalpha q(t)\right)\phi(x,y).
+\label{eq:irregular-2d-caputo-u}
+\end{equation}
+The source term is defined by substituting the manufactured solution into \eqref{eq:irregular-2d-pde}:
+\begin{equation}
+ f(t,x,y)
+ =
+ \Dtalpha u^\ast
+ -
+ \grad\cdot\left(a\grad u^\ast\right)
+ +
+ \bb\cdot\grad u^\ast
+ +
+ \lambda (u^\ast)^3.
+\label{eq:irregular-2d-source-def}
+\end{equation}
+Equivalently, using the separable form $u^\ast=q\phi$, this can be written compactly as
+\begin{equation}
+\begin{aligned}
+ f(t,x,y)
+ ={}&
+ \left(\Dtalpha q(t)\right)\phi(x,y)
+ -
+ q(t)\left[\grad a(x,y)\cdot\grad\phi(x,y)+a(x,y)\Delta\phi(x,y)\right]
+ \\
+&
+ +
+ q(t)\,\bb(x,y)\cdot\grad\phi(x,y)
+ +
+ \lambda q(t)^3\phi(x,y)^3.
+\end{aligned}
+\label{eq:irregular-2d-source-compact}
+\end{equation}
+For implementation, it is not necessary to expand the polynomial $\phi$. A stable and transparent way to evaluate the source is to write
+\begin{equation}
+ \phi(x,y)=\psi(x,y)\chi(x,y),
+ \qquad
+ \psi(x,y)=(1-x^2)(1-y^2),
+ \qquad
+ \chi(x,y)=(x+0.3)^2+(y-0.2)^2-r_0^2.
+\label{eq:irregular-2d-psi-chi}
+\end{equation}
+Then
+\begin{equation}
+ \grad\phi=\chi\grad\psi+\psi\grad\chi,
+ \qquad
+ \Delta\phi=\chi\Delta\psi+2\grad\psi\cdot\grad\chi+\psi\Delta\chi,
+\label{eq:irregular-2d-phi-derivatives}
+\end{equation}
+where
+\begin{equation}
+\begin{aligned}
+ \grad\psi
+ &=
+ \begin{pmatrix}
+ -2x(1-y^2)\\
+ -2y(1-x^2)
+ \end{pmatrix},
+&
+ \Delta\psi
+ &=2x^2+2y^2-4,\\
+ \grad\chi
+ &=
+ \begin{pmatrix}
+ 2(x+0.3)\\
+ 2(y-0.2)
+ \end{pmatrix},
+&
+ \Delta\chi
+ &=4,
+\end{aligned}
+\label{eq:irregular-2d-aux-derivatives}
+\end{equation}
+and
+\begin{equation}
+ \grad a(x,y)
+ =
+ \begin{pmatrix}
+ 0.3\pi\cos(\pi x)\cos(\pi y)\\
+ -0.3\pi\sin(\pi x)\sin(\pi y)
+ \end{pmatrix}.
+\label{eq:irregular-2d-grad-a}
+\end{equation}
+Equations \eqref{eq:irregular-2d-source-compact}--\eqref{eq:irregular-2d-grad-a} give a complete analytic expression for the manufactured forcing term.
+
+\subsection{PINN setup for the irregular-domain benchmark}
+
+The loss function follows the same structure as in the preceding experiments. The interior residual is evaluated at collocation points sampled from $(0,T]\times\Omega$, where spatial points are generated by rejection sampling in $(-1,1)^2$ and discarding points inside $B_{r_0}(c)$. Boundary points are sampled on both the outer square boundary and the inner circular boundary. For the circular boundary, we use the parametrization
+\begin{equation}
+ x=-0.3+r_0\cos\theta,
+ \qquad
+ y=0.2+r_0\sin\theta,
+ \qquad
+ \theta\in[0,2\pi).
+\label{eq:irregular-2d-circle-param}
+\end{equation}
+The initial points are sampled inside $\Omega$ at $t=0$.
+
+In this benchmark, the primary objective is not to rescan all quadrature configurations, but to demonstrate that the proposed transformed formulation remains effective in a two-dimensional nonlinear problem with heterogeneous coefficients and an irregular geometry. We therefore report results for the transformed schemes, especially GJ-II and MC-II, and optionally include GJ-I as a direct-form reference. A typical setting is
+\begin{equation}
+ \alpha\in\{1.25,1.5,1.75\},
+ \qquad
+ M_{\rm GJ}\in\{32,64\},
+ \qquad
+ M_{\rm MC}\in\{640,1280\}.
+\label{eq:irregular-2d-parameters}
+\end{equation}
+The relative error is evaluated on a separate test set sampled from $(0,T]\times\Omega$:
+\begin{equation}
+ e_r(\theta)
+ =
+ \frac{
+ \left(\sum_{i=1}^{N_{\rm test}}|u_\theta(t_i,x_i,y_i)-u^\ast(t_i,x_i,y_i)|^2\right)^{1/2}
+ }{
+ \left(\sum_{i=1}^{N_{\rm test}}|u^\ast(t_i,x_i,y_i)|^2\right)^{1/2}
+ }.
+\label{eq:irregular-2d-relative-error}
+\end{equation}
+
+\subsection{Suggested figures and table}
+
+For this experiment, we recommend reporting: (i) the irregular domain and sampled collocation points; (ii) the exact solution, the neural-network prediction, and the absolute error at a representative time such as $t=0.5$; and (iii) a table summarizing the relative error, training time, and GPU memory consumption for different $\alpha$ and quadrature strategies.
+
+\begin{table}[t]
+\centering
+\caption{Suggested result table for the two-dimensional nonlinear heterogeneous diffusion-wave equation on the irregular domain. The entries should be filled after training.}
+\label{tab:irregular-2d-results}
+\begin{tabular}{ccccc}
+\toprule
+$\alpha$ & Method & $M$ & Relative $L^2$ error & Time / memory \\
+\midrule
+1.25 & MC-II & 640 or 1280 & -- & -- \\
+1.25 & GJ-II & 32 or 64 & -- & -- \\
+1.50 & MC-II & 640 or 1280 & -- & -- \\
+1.50 & GJ-II & 32 or 64 & -- & -- \\
+1.75 & MC-II & 640 or 1280 & -- & -- \\
+1.75 & GJ-II & 32 or 64 & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Remark on the domain assumption.}
+This example is posed on a bounded Lipschitz domain with a smooth inner boundary. If the general problem statement in the manuscript currently restricts $\Omega$ to convex polyhedral domains, it should be relaxed to bounded Lipschitz domains, or this example should be explicitly described as an irregular-domain extension of the main computational framework.
+
+\end{document}

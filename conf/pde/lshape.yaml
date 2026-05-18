@@ -1,0 +1,25 @@
+name: lshape
+
+# L-shaped reference-comparison benchmark from lshape_case_package.
+al: 1.5
+tlim: [0, 1]
+method: GJ-II
+
+diffusion_amp: 0.25
+velocity_scale: 0.2
+reference_data: data/lshape/lshape_reference.npz
+reference_gif: data/lshape/lshape_reference.gif
+
+MC:
+  nums: 640
+  eps: 1.0e-8
+GJ:
+  nums: 64
+
+RAD:
+  use: false
+  ratio: 0.3
+  batch:
+    in: 20000
+    bd: 500
+    init: 500

@@ -8,6 +8,7 @@ This project has been migrated from PyTorch to JAX. This guide outlines the new 
 - `optax` (Optimization)
 - `hydra-core` (Configuration)
 - `wandb` (Logging)
+- `pymittagleffler` (Section 4.3 analytical solution)
 
 Install dependencies:
 ```bash
@@ -41,6 +42,8 @@ Should output something like `[GpuDevice(id=0, process_index=0), ...]`.
 ## Directory Structure
 - `libs/`
   - `jax_pinn.py`: Flax-based MLP implementation.
+  - `jax_pde_forward.py`: JAX implementation of the Section 4.3 forward diffusion-wave case.
+  - `jax_pde_irregular.py`: JAX implementations of the two irregular-domain diffusion-wave cases.
   - `jax_pde_burgers.py`: JAX implementation of fractional Burgers PDE.
   - `jax_sample.py`: NumPy-based data sampler.
 - `conf/`: Hydra configuration files.
@@ -48,19 +51,51 @@ Should output something like `[GpuDevice(id=0, process_index=0), ...]`.
   - `model/`: Model configs.
   - `pde/`: PDE configs.
   - `training/`: Training configs.
-- `jax_burgers.py`: Main training script using JAX, Hydra, and WandB.
+- `jax_forward.py`: Main Section 4.3 forward training script using JAX, Hydra, and WandB.
+- `jax_irregular.py`: Main two-dimensional irregular-domain training script.
+- `jax_burgers.py`: Burgers training script retained for the later case.
 - `tests/`: Unit tests.
 
 ## Running Experiments
 To run the training script with default configuration:
 ```bash
-python jax_burgers.py
+python jax_forward.py
 ```
 
 To override configuration parameters:
 ```bash
-python jax_burgers.py training.lr=0.01 pde.method=MC-I
+python jax_forward.py training.learning_rate=0.01 pde.method=MC-I
 ```
+
+To run the two irregular-domain cases:
+```bash
+python jax_irregular.py pde=irregular_hole
+python jax_irregular.py pde=lshape
+```
+
+The L-shaped reference solution is stored in `data/lshape/lshape_reference.npz`,
+with an accompanying GIF at `data/lshape/lshape_reference.gif`. Regenerate both
+with:
+```bash
+python scripts/generate_lshape_reference.py
+```
+
+To regenerate the four smoke figures under `outputs/smoke_results/`, run:
+```bash
+python scripts/generate_smoke_results.py --case burgers
+python scripts/generate_smoke_results.py --case forward
+python scripts/generate_smoke_results.py --case irregular_hole
+python scripts/generate_smoke_results.py --case lshape
+```
+The two-dimensional smoke figures use separate `x-y` heatmaps at `t=T/2`
+and `t=T` by default.
+
+## Timing
+JAX training scripts record paper-style timing by default. A timing epoch is
+configured as `training.timing.epoch_steps`, defaulting to 5000 optimizer steps.
+Each completed timing epoch is appended to `timing.csv` in the Hydra output
+directory with elapsed seconds, total seconds, running average epoch time, and
+loss.
 
 To run on multiple GPUs, simply run the script on a machine with multiple GPUs. The script automatically detects available devices and uses `pmap` for data parallelism.
 
@@ -74,6 +109,5 @@ To run on multiple GPUs, simply run the script on a machine with multiple GPUs. 
 ## Verification
 Run tests to verify the installation:
 ```bash
-python tests/test_jax_pde.py
-python tests/test_sampler.py
+pytest tests/test_jax_forward.py tests/test_jax_irregular.py tests/test_jax_pde.py tests/test_sampler.py
 ```

@@ -8,9 +8,9 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from libs.jax_evaluator import BaseEvaluator
-from libs.jax_pde_burgers import JAXDWBurgers
+from libs.jax_pde_irregular import JAXIrregularHoleDW, JAXLShapeDW
 from libs.jax_pinn import create_train_state
-from libs.jax_sample import TimeSpaceEasySampler
+from libs.jax_sample import IrregularHoleSampler, LShapeSampler
 from libs.jax_utils import (
     EpochTimer,
     replicate,
@@ -20,8 +20,41 @@ from libs.jax_utils import (
 )
 
 
+def _build_case(cfg, n_devices):
+    batch = OmegaConf.to_container(cfg.training.batch)
+    if cfg.pde.name == "irregular_hole":
+        pde = JAXIrregularHoleDW(cfg.pde, cfg.weighting)
+        sampler = IrregularHoleSampler(
+            tlim=cfg.pde.tlim,
+            batch=batch,
+            center=cfg.pde.center,
+            r0=cfg.pde.r0,
+            n_devices=n_devices,
+            seed=cfg.seed,
+            shard=True,
+        )
+        label = "circular-hole manufactured diffusion-wave"
+    elif cfg.pde.name == "lshape":
+        pde = JAXLShapeDW(cfg.pde, cfg.weighting)
+        sampler = LShapeSampler(
+            tlim=cfg.pde.tlim,
+            batch=batch,
+            n_devices=n_devices,
+            seed=cfg.seed,
+            shard=True,
+        )
+        label = "L-shaped reference-comparison diffusion-wave"
+    else:
+        raise ValueError(
+            "jax_irregular.py expects pde.name to be irregular_hole or lshape"
+        )
+    return pde, sampler, label
+
+
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    cfg.model.input_dim = 3
+
     if cfg.wandb.mode != "disabled":
         wandb.init(
             project=cfg.wandb.project,
@@ -39,28 +72,22 @@ def main(cfg: DictConfig):
     state = create_train_state(model_key, cfg.model, cfg.training, cfg.weighting)
     print(
         f"[*] Model: {cfg.model.num_layers} layers x "
-        f"{cfg.model.hidden_dim} ({cfg.model.activation})"
+        f"{cfg.model.hidden_dim} ({cfg.model.activation}), input_dim={cfg.model.input_dim}"
     )
 
-    pde = JAXDWBurgers(cfg.pde, cfg.weighting)
-    print(f"[*] PDE method: {cfg.pde.method}, alpha = {cfg.pde.al}")
-
-    sampler = TimeSpaceEasySampler(
-        axeslim=cfg.pde.xlim,
-        tlim=cfg.pde.tlim,
-        batch=OmegaConf.to_container(cfg.training.batch),
-        n_devices=n_devices,
-        shard=True,
-    )
+    pde, sampler, label = _build_case(cfg, n_devices)
     evaluator = BaseEvaluator(cfg, pde)
+    print(f"[*] PDE: {label}")
+    print(f"[*] Method: {cfg.pde.method}, alpha = {cfg.pde.al}")
 
     state = replicate(state)
     pmap_keys = jax.random.split(root_key, n_devices)
 
     max_steps = cfg.training.max_steps
     log_every = getattr(cfg.training, "log_every_steps", 100)
-    save_every = getattr(cfg.saving, "save_every_steps",
-                         getattr(cfg.training, "save_every_steps", 1000))
+    save_every = getattr(
+        cfg.saving, "save_every_steps", getattr(cfg.training, "save_every_steps", 1000)
+    )
     keep_ckpts = getattr(cfg.saving, "num_keep_ckpts", 5)
     update_weights_every = getattr(
         cfg.weighting,

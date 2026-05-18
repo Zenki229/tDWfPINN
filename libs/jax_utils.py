@@ -1,4 +1,6 @@
 import os
+import csv
+import time
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -73,3 +75,134 @@ def restore_checkpoint(state, workdir, step=None, name="checkpoint"):
     if restored is target:
         return state
     return restored
+
+
+def _cfg_get(config, name, default=None):
+    if config is None:
+        return default
+    if isinstance(config, dict):
+        return config.get(name, default)
+    try:
+        return getattr(config, name)
+    except (AttributeError, KeyError):
+        return default
+
+
+def _format_seconds(seconds):
+    seconds = float(seconds)
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:05.2f}"
+
+
+class EpochTimer:
+    """Record paper-style timing every fixed number of optimizer steps."""
+
+    def __init__(self, output_dir, enabled=True, epoch_steps=5000,
+                 filename="timing.csv"):
+        self.output_dir = output_dir
+        self.enabled = bool(enabled)
+        self.epoch_steps = int(epoch_steps)
+        self.filename = filename
+        self.path = os.path.join(output_dir, filename)
+        self.start_time = None
+        self.epoch_start_time = None
+        self.epoch_times = []
+
+        if self.enabled and self.epoch_steps <= 0:
+            raise ValueError("timing epoch_steps must be positive")
+
+    @classmethod
+    def from_config(cls, training_config, output_dir):
+        timing_config = _cfg_get(training_config, "timing", None)
+        enabled = _cfg_get(timing_config, "enabled", True)
+        epoch_steps = _cfg_get(
+            timing_config,
+            "epoch_steps",
+            _cfg_get(training_config, "epoch_steps", 5000),
+        )
+        filename = _cfg_get(timing_config, "filename", "timing.csv")
+        return cls(output_dir, enabled=enabled, epoch_steps=epoch_steps,
+                   filename=filename)
+
+    def start(self):
+        if not self.enabled:
+            return
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.start_time = time.perf_counter()
+        self.epoch_start_time = self.start_time
+        with open(self.path, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "epoch",
+                    "step",
+                    "epoch_steps",
+                    "elapsed_seconds",
+                    "total_seconds",
+                    "average_epoch_seconds",
+                    "loss",
+                ],
+            )
+            writer.writeheader()
+        print(
+            f"[*] Timing every {self.epoch_steps} steps; "
+            f"writing {self.path}"
+        )
+
+    def maybe_record(self, step, loss_val):
+        if not self.enabled or step % self.epoch_steps != 0:
+            return None
+
+        jax.block_until_ready(loss_val)
+        now = time.perf_counter()
+        elapsed = now - self.epoch_start_time
+        total = now - self.start_time
+        self.epoch_times.append(elapsed)
+        avg = float(np.mean(self.epoch_times))
+        loss = float(jnp.mean(loss_val))
+        epoch = len(self.epoch_times)
+
+        row = {
+            "epoch": epoch,
+            "step": step,
+            "epoch_steps": self.epoch_steps,
+            "elapsed_seconds": f"{elapsed:.8f}",
+            "total_seconds": f"{total:.8f}",
+            "average_epoch_seconds": f"{avg:.8f}",
+            "loss": f"{loss:.8e}",
+        }
+        with open(self.path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+            writer.writerow(row)
+
+        self.epoch_start_time = now
+        print(
+            f"  Timing epoch {epoch:>3d} | step {step:>7d} | "
+            f"elapsed {_format_seconds(elapsed)} | "
+            f"avg {_format_seconds(avg)}"
+        )
+        return {
+            "timing/epoch": epoch,
+            "timing/elapsed_seconds": elapsed,
+            "timing/average_epoch_seconds": avg,
+        }
+
+    def finish(self, max_steps):
+        if not self.enabled:
+            return
+        total = time.perf_counter() - self.start_time
+        if self.epoch_times:
+            avg = float(np.mean(self.epoch_times))
+            print(
+                f"[*] Timing summary: {len(self.epoch_times)} full timing "
+                f"epoch(s), average {_format_seconds(avg)}, total "
+                f"{_format_seconds(total)}"
+            )
+        else:
+            print(
+                f"[*] Timing summary: no complete {self.epoch_steps}-step "
+                f"timing epoch in {max_steps} step(s); total "
+                f"{_format_seconds(total)}"
+            )

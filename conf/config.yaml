@@ -1,6 +1,6 @@
 defaults:
   - model: mlp
-  - pde: burgers
+  - pde: forward
   - training: default
   - _self_
 

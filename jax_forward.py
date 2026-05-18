@@ -8,7 +8,7 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from libs.jax_evaluator import BaseEvaluator
-from libs.jax_pde_burgers import JAXDWBurgers
+from libs.jax_pde_forward import JAXDWForward
 from libs.jax_pinn import create_train_state
 from libs.jax_sample import TimeSpaceEasySampler
 from libs.jax_utils import (
@@ -42,8 +42,11 @@ def main(cfg: DictConfig):
         f"{cfg.model.hidden_dim} ({cfg.model.activation})"
     )
 
-    pde = JAXDWBurgers(cfg.pde, cfg.weighting)
-    print(f"[*] PDE method: {cfg.pde.method}, alpha = {cfg.pde.al}")
+    pde = JAXDWForward(cfg.pde, cfg.weighting)
+    print(
+        f"[*] PDE method: {cfg.pde.method}, alpha = {cfg.pde.al}, "
+        f"k = {cfg.pde.k}, lambda = {cfg.pde.lam}"
+    )
 
     sampler = TimeSpaceEasySampler(
         axeslim=cfg.pde.xlim,
@@ -59,8 +62,9 @@ def main(cfg: DictConfig):
 
     max_steps = cfg.training.max_steps
     log_every = getattr(cfg.training, "log_every_steps", 100)
-    save_every = getattr(cfg.saving, "save_every_steps",
-                         getattr(cfg.training, "save_every_steps", 1000))
+    save_every = getattr(
+        cfg.saving, "save_every_steps", getattr(cfg.training, "save_every_steps", 1000)
+    )
     keep_ckpts = getattr(cfg.saving, "num_keep_ckpts", 5)
     update_weights_every = getattr(
         cfg.weighting,

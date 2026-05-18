@@ -1,0 +1,5 @@
+case,relative_error,final_smoke_loss,figure
+forward,1.00149905e+00,6.65842593e-01,outputs\smoke_results\forward_smoke.png
+burgers,9.09524112e-01,3.30018520e+00,outputs\smoke_results\burgers_smoke.png
+irregular_hole,3.97507033e+00,8.29563439e-02,outputs\smoke_results\irregular_hole_t0p500_smoke.png;outputs\smoke_results\irregular_hole_t1p000_smoke.png
+lshape,1.85527354e+00,1.92196220e-02,outputs\smoke_results\lshape_t0p500_smoke.png;outputs\smoke_results\lshape_t1p000_smoke.png

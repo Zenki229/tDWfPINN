@@ -106,3 +106,161 @@ class TimeSpaceEasySampler(BaseEasySampler):
             prob = err / err_sum
         ind = np.random.choice(len(err), size=num_outputs, replace=False, p=prob)
         return p[ind]
+
+
+class IrregularHoleSampler(BaseEasySampler):
+    """Sampler for (-1, 1)^2 with an off-center circular hole."""
+
+    def __init__(self, tlim, batch, center=(-0.3, 0.2), r0=0.25, n_devices=1,
+                 seed=0, shard=False):
+        super().__init__(batch, n_devices, shard)
+        self.tlim = tlim
+        self.center = np.asarray(center, dtype=float)
+        self.r0 = float(r0)
+        self._rng = np.random.RandomState(seed)
+
+    def _sample_time(self, size):
+        return self._rng.rand(size) * (self.tlim[1] - self.tlim[0]) + self.tlim[0]
+
+    def _inside_domain(self, xy):
+        in_square = np.all((xy > -1.0) & (xy < 1.0), axis=1)
+        outside_hole = np.sum((xy - self.center) ** 2, axis=1) > self.r0 ** 2
+        return in_square & outside_hole
+
+    def _sample_spatial(self, size):
+        chunks = []
+        remaining = size
+        while remaining > 0:
+            proposal = self._rng.uniform(-1.0, 1.0, size=(max(remaining * 2, 16), 2))
+            accepted = proposal[self._inside_domain(proposal)]
+            if accepted.size == 0:
+                continue
+            take = min(remaining, accepted.shape[0])
+            chunks.append(accepted[:take])
+            remaining -= take
+        return np.concatenate(chunks, axis=0)
+
+    def _sample_boundary(self, size):
+        node = np.zeros((size, 3))
+        node[:, 0] = self._sample_time(size)
+        pieces = self._rng.randint(0, 5, size=size)
+
+        for piece in range(5):
+            idx = np.where(pieces == piece)[0]
+            if len(idx) == 0:
+                continue
+
+            if piece < 4:
+                vals = self._rng.uniform(-1.0, 1.0, size=len(idx))
+                if piece == 0:
+                    node[idx, 1] = -1.0
+                    node[idx, 2] = vals
+                elif piece == 1:
+                    node[idx, 1] = 1.0
+                    node[idx, 2] = vals
+                elif piece == 2:
+                    node[idx, 1] = vals
+                    node[idx, 2] = -1.0
+                else:
+                    node[idx, 1] = vals
+                    node[idx, 2] = 1.0
+            else:
+                theta = self._rng.uniform(0.0, 2.0 * np.pi, size=len(idx))
+                node[idx, 1] = self.center[0] + self.r0 * np.cos(theta)
+                node[idx, 2] = self.center[1] + self.r0 * np.sin(theta)
+
+        return node
+
+    def sample(self):
+        points = {}
+
+        size_in = self.batch["in"]
+        xy_in = self._sample_spatial(size_in)
+        points["in"] = np.column_stack([self._sample_time(size_in), xy_in])
+
+        points["bd"] = self._sample_boundary(self.batch["bd"])
+
+        size_init = self.batch["init"]
+        xy_init = self._sample_spatial(size_init)
+        points["init"] = np.column_stack([np.zeros(size_init), xy_init])
+        return points
+
+
+class LShapeSampler(BaseEasySampler):
+    """Sampler for Omega_L = [-1, 1]^2 \\ [0, 1]^2."""
+
+    def __init__(self, tlim, batch, n_devices=1, seed=0, shard=False):
+        super().__init__(batch, n_devices, shard)
+        self.tlim = tlim
+        self._rng = np.random.RandomState(seed)
+
+    def _sample_time(self, size):
+        return self._rng.rand(size) * (self.tlim[1] - self.tlim[0]) + self.tlim[0]
+
+    def _inside_domain(self, xy):
+        x = xy[:, 0]
+        y = xy[:, 1]
+        in_square = (x > -1.0) & (x < 1.0) & (y > -1.0) & (y < 1.0)
+        outside_removed_quadrant = (x < 0.0) | (y < 0.0)
+        return in_square & outside_removed_quadrant
+
+    def _sample_spatial(self, size):
+        chunks = []
+        remaining = size
+        while remaining > 0:
+            proposal = self._rng.uniform(-1.0, 1.0, size=(max(remaining * 2, 16), 2))
+            accepted = proposal[self._inside_domain(proposal)]
+            if accepted.size == 0:
+                continue
+            take = min(remaining, accepted.shape[0])
+            chunks.append(accepted[:take])
+            remaining -= take
+        return np.concatenate(chunks, axis=0)
+
+    def _sample_boundary(self, size):
+        node = np.zeros((size, 3))
+        node[:, 0] = self._sample_time(size)
+        pieces = self._rng.randint(0, 6, size=size)
+
+        for piece in range(6):
+            idx = np.where(pieces == piece)[0]
+            if len(idx) == 0:
+                continue
+            vals = self._rng.uniform(-1.0, 1.0, size=len(idx))
+            vals01 = self._rng.uniform(0.0, 1.0, size=len(idx))
+            vals_neg = self._rng.uniform(-1.0, 0.0, size=len(idx))
+
+            if piece == 0:
+                node[idx, 1] = -1.0
+                node[idx, 2] = vals
+            elif piece == 1:
+                node[idx, 1] = vals
+                node[idx, 2] = -1.0
+            elif piece == 2:
+                node[idx, 1] = 1.0
+                node[idx, 2] = vals_neg
+            elif piece == 3:
+                node[idx, 1] = vals_neg
+                node[idx, 2] = 1.0
+            elif piece == 4:
+                node[idx, 1] = 0.0
+                node[idx, 2] = vals01
+            else:
+                node[idx, 1] = vals01
+                node[idx, 2] = 0.0
+
+        return node
+
+    def sample(self):
+        points = {}
+
+        size_in = self.batch["in"]
+        xy_in = self._sample_spatial(size_in)
+        points["in"] = np.column_stack([self._sample_time(size_in), xy_in])
+
+        points["bd"] = self._sample_boundary(self.batch["bd"])
+
+        size_init = self.batch["init"]
+        xy_init = self._sample_spatial(size_init)
+        points["init"] = np.column_stack([np.zeros(size_init), xy_init])
+        return points

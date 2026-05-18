@@ -7,5 +7,7 @@ wandb
 matplotlib
 numpy
 scipy
+pymittagleffler
+pillow
 absl-py
 ml_collections
