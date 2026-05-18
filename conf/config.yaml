@@ -7,12 +7,34 @@ defaults:
 mode: train
 version: v1
 seed: 42
-cuda_dev: 0
 
 wandb:
   project: "jax-pinn"
   entity: null
-  mode: "online" # or disabled
+  mode: "online"
+
+weighting:
+  scheme: grad_norm           # "grad_norm" or "ntk" or "none"
+  init_weights:
+    in: 1.0
+    bd: 1.0
+    init: 1.0
+    init_dt: 1.0
+  momentum: 0.9
+  update_every_steps: 500
+  use_causal: false
+  causal_tol: 1.0
+  num_chunks: 10
+
+logging:
+  log_losses: true
+  log_weights: true
+  log_grads: false
+  log_ntk: false
+
+saving:
+  save_every_steps: 1000
+  num_keep_ckpts: 5
 
 hydra:
   run:

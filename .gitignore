@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+.claude/
+.pytest_cache/
+jaxpi/
+pinns-jax/
 __pycache__/
 *.py[cod]
 *$py.class

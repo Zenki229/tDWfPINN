@@ -1,184 +1,106 @@
 import os
+
 import hydra
-import wandb
 import jax
 import jax.numpy as jnp
-import optax
-import numpy as np
-from flax.training import train_state
+import wandb
 from omegaconf import DictConfig, OmegaConf
-from libs.jax_pinn import create_model
+
+from libs.jax_evaluator import BaseEvaluator
 from libs.jax_pde_burgers import JAXDWBurgers
+from libs.jax_pinn import create_train_state
 from libs.jax_sample import TimeSpaceEasySampler
-from functools import partial
+from libs.jax_utils import replicate, restore_checkpoint, save_checkpoint, unreplicate
 
-class TrainState(train_state.TrainState):
-    pass
-
-def get_pde_loss(params, apply_fn, pde, batch, key, weights):
-    # pde.residual returns dict of losses (vectors)
-    # We need to compute scalar loss
-    losses = pde.residual(apply_fn, params, batch, key)
-    
-    # Convert weights to dict if it's a tuple (for hashing)
-    if isinstance(weights, tuple):
-        weights = dict(weights)
-
-    total_loss = 0.0
-    loss_dict = {}
-    
-    for k, v in losses.items():
-        # MSE loss
-        l = jnp.mean(v ** 2)
-        loss_dict[k] = l
-        if k in weights:
-            total_loss += weights[k] * l
-            
-    return total_loss, loss_dict
-
-@partial(jax.pmap, axis_name='batch', static_broadcasted_argnums=(3, 4, 5))
-def train_step(state, batch, key, pde, weights, gradient_accumulation_steps=1):
-    # Split key for MC sampling inside PDE
-    key, subkey = jax.random.split(key)
-    
-    def loss_fn(params):
-        loss, aux = get_pde_loss(params, state.apply_fn, pde, batch, subkey, weights)
-        return loss, aux
-        
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    (loss, aux), grads = grad_fn(state.params)
-    
-    # Sync gradients across devices
-    grads = jax.lax.pmean(grads, axis_name='batch')
-    loss = jax.lax.pmean(loss, axis_name='batch')
-    
-    # Update state
-    state = state.apply_gradients(grads=grads)
-    return state, loss, aux, key
-
-def shard(data, n_devices):
-    # data is a dict of numpy arrays
-    # We want to reshape each array from (B, ...) to (n_devices, B/n_devices, ...)
-    sharded_data = {}
-    for k, v in data.items():
-        if v.shape[0] % n_devices != 0:
-            # Pad or trim if not divisible (simplification: trim)
-            new_size = (v.shape[0] // n_devices) * n_devices
-            v = v[:new_size]
-        
-        B = v.shape[0]
-        shape = (n_devices, B // n_devices) + v.shape[1:]
-        sharded_data[k] = v.reshape(shape)
-    return sharded_data
 
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    # Initialize WandB
     if cfg.wandb.mode != "disabled":
         wandb.init(
             project=cfg.wandb.project,
             entity=cfg.wandb.entity,
             mode=cfg.wandb.mode,
-            config=OmegaConf.to_container(cfg, resolve=True)
+            config=OmegaConf.to_container(cfg, resolve=True),
         )
 
-    # Device setup
     n_devices = jax.local_device_count()
-    print(f"Running on {n_devices} devices: {jax.devices()}")
+    print(f"[*] Running on {n_devices} device(s): {jax.devices()}")
 
-    # Initialize model
-    key = jax.random.PRNGKey(cfg.seed)
-    key, model_key = jax.random.split(key)
-    
-    model, params = create_model(
-        model_key, 
-        input_dim=cfg.model.input_dim,
-        hidden_dim=cfg.model.hidden_dim,
-        output_dim=cfg.model.output_dim,
-        num_layers=cfg.model.num_layers,
-        activation=cfg.model.activation
+    root_key = jax.random.PRNGKey(cfg.seed)
+    root_key, model_key = jax.random.split(root_key)
+
+    state = create_train_state(model_key, cfg.model, cfg.training, cfg.weighting)
+    print(
+        f"[*] Model: {cfg.model.num_layers} layers x "
+        f"{cfg.model.hidden_dim} ({cfg.model.activation})"
     )
 
-    # Optimizer
-    optimizer = optax.adam(learning_rate=cfg.training.lr)
-    
-    # TrainState
-    state = TrainState.create(
-        apply_fn=model.apply,
-        params=params,
-        tx=optimizer
-    )
-    
-    # Replicate state for pmap
-    state = jax.device_put_replicated(state, jax.local_devices())
-    
-    # Keys for pmap
-    # keys = jax.random.split(key, n_devices)
-    # We pass a single key to pmap and split it inside, or pass different keys?
-    # Usually we pass different keys.
-    pmap_keys = jax.random.split(key, n_devices)
+    pde = JAXDWBurgers(cfg.pde, cfg.weighting)
+    print(f"[*] PDE method: {cfg.pde.method}, alpha = {cfg.pde.al}")
 
-    # PDE and Sampler
-    pde = JAXDWBurgers(cfg.pde)
-    
-    # Adjust batch size for multi-device? 
-    # Usually config batch size is global.
     sampler = TimeSpaceEasySampler(
-        axeslim=cfg.pde.xlim, 
-        tlim=cfg.pde.tlim, 
-        batch=OmegaConf.to_container(cfg.training.batch)
+        axeslim=cfg.pde.xlim,
+        tlim=cfg.pde.tlim,
+        batch=OmegaConf.to_container(cfg.training.batch),
+        n_devices=n_devices,
+        shard=True,
     )
+    evaluator = BaseEvaluator(cfg, pde)
 
-    # Weights
-    weights = OmegaConf.to_container(cfg.pde.weighting)
-    # Convert to tuple for hashing in pmap
-    weights = tuple(sorted(weights.items()))
+    state = replicate(state)
+    pmap_keys = jax.random.split(root_key, n_devices)
 
-    # Training Loop
-    iterator = iter(sampler)
-    
-    for step in range(cfg.training.max_steps):
-        # Sample data (CPU)
-        batch_cpu = next(iterator)
-        
-        # Shard data
-        batch_sharded = shard(batch_cpu, n_devices)
-        
-        # Train step
-        state, loss, aux, pmap_keys = train_step(state, batch_sharded, pmap_keys, pde, weights, 1)
-        
-        # Logging (take first device output)
-        if step % 100 == 0 or step == cfg.training.max_steps - 1:
-            # loss and aux are sharded, take mean or first
-            avg_loss = jnp.mean(loss).item()
-            
-            log_dict = {"train/loss": avg_loss, "step": step}
-            
-            # Unpack aux losses
-            # aux is a dict of sharded arrays
-            for k, v in aux.items():
-                log_dict[f"train/{k}"] = jnp.mean(v).item()
-            
-            print(f"Step {step}: Loss = {avg_loss:.4e}")
+    max_steps = cfg.training.max_steps
+    log_every = getattr(cfg.training, "log_every_steps", 100)
+    save_every = getattr(cfg.saving, "save_every_steps",
+                         getattr(cfg.training, "save_every_steps", 1000))
+    keep_ckpts = getattr(cfg.saving, "num_keep_ckpts", 5)
+    update_weights_every = getattr(
+        cfg.weighting,
+        "update_every_steps",
+        getattr(cfg.training, "update_weights_every_steps", 500),
+    )
+    weighting_scheme = getattr(cfg.weighting, "scheme", "none")
+    workdir = os.getcwd()
+
+    print(f"[*] Training {max_steps} steps, log every {log_every}")
+    print(f"[*] Workdir: {workdir}")
+
+    if getattr(cfg.training, "restore", False):
+        restored = restore_checkpoint(state, workdir)
+        if restored is not state:
+            state = replicate(restored)
+
+    for step in range(max_steps):
+        batch_sharded = next(sampler)
+        state, loss_val, aux, pmap_keys = pde.step(state, batch_sharded, pmap_keys)
+
+        if weighting_scheme != "none" and (step + 1) % update_weights_every == 0:
+            state = pde.update_weights(state, batch_sharded, pmap_keys)
+
+        if step % log_every == 0 or step == max_steps - 1:
+            batch_eval = {k: v[0] for k, v in batch_sharded.items()}
+            eval_state = unreplicate(state)
+            log_dict = evaluator(eval_state, batch_eval, pmap_keys[0], step=step)
+
+            avg_loss = float(jnp.mean(loss_val))
+            log_dict["train/loss"] = avg_loss
+            log_dict["step"] = step
+
+            terms = " ".join(
+                f"{k}={v:.3e}" for k, v in log_dict.items() if k.endswith("_loss")
+            )
+            print(f"  Step {step:>6d} | Loss {avg_loss:.4e} | {terms}")
+
             if cfg.wandb.mode != "disabled":
-                wandb.log(log_dict)
+                wandb.log(log_dict, step=step)
 
-    # Save model (taking first device params)
-    # state.params is replicated
-    params_cpu = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-    
-    # Save parameters
-    save_dir = os.path.join(os.getcwd(), 'checkpoints')
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f'model_step_{cfg.training.max_steps}.npy')
-    # Flatten params dictionary for saving or use pickle
-    # Simple pickle save
-    import pickle
-    with open(save_path.replace('.npy', '.pkl'), 'wb') as f:
-        pickle.dump(params_cpu, f)
-    
-    print(f"Model saved to {save_path.replace('.npy', '.pkl')}")
-    print("Training finished.")
+        if (step + 1) % save_every == 0:
+            save_checkpoint(unreplicate(state), workdir, keep=keep_ckpts)
+
+    save_checkpoint(unreplicate(state), workdir, keep=keep_ckpts, name="final")
+    print("[*] Training finished. Model saved.")
+
 
 if __name__ == "__main__":
     main()

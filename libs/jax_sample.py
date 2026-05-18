@@ -2,137 +2,107 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 
+
 class BaseEasySampler:
-    def __init__(self, batch):
-        self.batch = batch 
-    
+    def __init__(self, batch, n_devices=1, shard=False):
+        self.batch = batch
+        self.n_devices = n_devices
+        self.shard = shard
+
     def __iter__(self):
         return self
-    
+
     def __next__(self):
-        return self.sample()
-    
+        batch = self.sample()
+        if self.shard or self.n_devices > 1:
+            batch = self._shard(batch)
+        return batch
+
     def sample(self, **args):
-        raise NotImplementedError("Subclasses should implement this!")
+        raise NotImplementedError
+
+    def _shard(self, data):
+        """Reshape dict of arrays to (n_devices, B//n_devices, ...)."""
+        sharded = {}
+        for k, v in data.items():
+            if v.shape[0] % self.n_devices != 0:
+                new_size = (v.shape[0] // self.n_devices) * self.n_devices
+                v = v[:new_size]
+            B = v.shape[0]
+            shape = (self.n_devices, B // self.n_devices) + v.shape[1:]
+            sharded[k] = v.reshape(shape)
+        return sharded
+
 
 class TimeSpaceEasySampler(BaseEasySampler):
-    def __init__(self, axeslim, tlim, batch):
-        super().__init__(batch)
+    """Samples points in the domain, on boundaries, and on initial surface."""
+
+    def __init__(self, axeslim, tlim, batch, n_devices=1, key=jax.random.PRNGKey(0),
+                 shard=False):
+        super().__init__(batch, n_devices, shard)
         self.axeslim = axeslim
         self.tlim = tlim
         self.dim = len(axeslim)
-        
+        self.key = key
+        self._rng = np.random.RandomState(0)
+
     def sample(self):
         size = self.batch
         points = {}
-        
-        # Sample in the domain
+
+        # Interior domain points
         size_in = size['in']
-        # t, x1, x2, ...
         node_in = np.zeros((size_in, self.dim + 1))
-        
-        leftlim = self.tlim[0]
-        rightlim = self.tlim[1]
-        length = rightlim - leftlim
-        node_in[:, 0] = np.random.rand(size_in) * length + leftlim
-        
+        node_in[:, 0] = self._rng.rand(size_in) * (self.tlim[1] - self.tlim[0]) + self.tlim[0]
         for i in range(self.dim):
-            leftlim = self.axeslim[i][0]
-            rightlim = self.axeslim[i][1]
-            length = rightlim - leftlim
-            node_in[:, i+1] = np.random.rand(size_in) * length + leftlim
-            
+            l, r = self.axeslim[i]
+            node_in[:, i + 1] = self._rng.rand(size_in) * (r - l) + l
         points['in'] = node_in
-        
-        # Sample on the boundary
+
+        # Boundary points (spatial boundaries at random times)
         size_bd = size['bd']
-        # We need to pick which boundary face to sample from
-        # There are 2 * dim faces (including time boundaries if we consider them, 
-        # but usually 'bd' means spatial boundary and 'init' means t=0)
-        # The original code includes t boundaries in 'bd' loop?
-        # Let's look at original code: 
-        # bd_num = torch.randint(low=0, high=2*self.dim, ...)
-        # It seems it samples from 2*dim spatial faces? 
-        # Wait, self.dim is spatial dimension (len(axeslim)).
-        # But node_in has dim+1 columns (time + space).
-        # Original code: 
-        # for i in range(2*self.dim): ...
-        # m, n = i//2, i % 2
-        # node_bd[i] = ... random t ...
-        # if j != m: random x_j
-        # else: fixed x_m (min or max)
-        # So it samples spatial boundaries at random times.
-        
-        bd_num = np.random.randint(0, 2*self.dim, size=size_bd)
+        bd_num = self._rng.randint(0, 2 * self.dim, size=size_bd)
         node_bd_list = []
-        
         for i in range(2 * self.dim):
-            ind = np.where(bd_num == i)[0]
-            num = len(ind)
+            idx = np.where(bd_num == i)[0]
+            num = len(idx)
             if num == 0:
                 continue
-                
-            m, n = i // 2, i % 2 # m is the spatial dimension index (0..dim-1), n is 0 or 1 (min or max)
-            
-            # Initialize with random time and space
-            # columns: t, x_0, x_1, ...
-            curr_bd = np.zeros((num, self.dim + 1))
-            
-            # Time column (0)
-            curr_bd[:, 0] = np.random.rand(num) * (self.tlim[1] - self.tlim[0]) + self.tlim[0]
-            
-            # Space columns (1..dim)
+            m, n = i // 2, i % 2
+            curr = np.zeros((num, self.dim + 1))
+            curr[:, 0] = self._rng.rand(num) * (self.tlim[1] - self.tlim[0]) + self.tlim[0]
             for j in range(self.dim):
                 if j != m:
-                    # Random sample for other dimensions
-                    l = self.axeslim[j][0]
-                    r = self.axeslim[j][1]
-                    curr_bd[:, j+1] = np.random.rand(num) * (r - l) + l
+                    l, r = self.axeslim[j]
+                    curr[:, j + 1] = self._rng.rand(num) * (r - l) + l
                 else:
-                    # Fixed value for the boundary dimension
-                    curr_bd[:, j+1] = self.axeslim[m][n]
-            
-            node_bd_list.append(curr_bd)
-            
+                    curr[:, j + 1] = self.axeslim[m][n]
+            node_bd_list.append(curr)
         if node_bd_list:
             points['bd'] = np.concatenate(node_bd_list, axis=0)
         else:
             points['bd'] = np.zeros((0, self.dim + 1))
 
-        # Sample initial condition (t=0)
+        # Initial condition points (t=0)
         size_init = size['init']
         node_init = np.zeros((size_init, self.dim + 1))
-        node_init[:, 0] = 0.0 # t=0
-        
+        node_init[:, 0] = 0.0
         for i in range(self.dim):
-            l = self.axeslim[i][0]
-            r = self.axeslim[i][1]
-            length = r - l
-            node_init[:, i+1] = np.random.rand(size_init) * length + l
-            
+            l, r = self.axeslim[i]
+            node_init[:, i + 1] = self._rng.rand(size_init) * (r - l) + l
         points['init'] = node_init
-        
+
         return points
 
     def rad_sampler(self, residual, points, num_outputs, key=None):
-        """
-        RAD sampling based on the residual.
-        residual: array of shape (N, 1) or (N,)
-        points: array of shape (N, D)
-        """
-        # Ensure numpy
-        residual = np.array(residual)
-        points = np.array(points)
-        
-        err = np.power(residual, 2)
-        # Avoid division by zero
-        err_sum = np.sum(err)
+        """Residual-based Adaptive Distribution (RAD) sampling."""
+        r = np.asarray(residual).ravel()
+        p = np.asarray(points)
+        err = r ** 2
+        err_sum = err.sum()
         if err_sum < 1e-10:
-            p = np.ones_like(err.flatten()) / len(err)
+            prob = np.ones(len(err)) / len(err)
         else:
-            p = (err / err_sum).flatten()
-            
-        size = points.shape[0]
-        # Weighted sampling without replacement
-        ind = np.random.choice(size, num_outputs, replace=False, p=p)
-        return points[ind]
+            prob = err / err_sum
+        ind = np.random.choice(len(err), size=num_outputs, replace=False, p=prob)
+        return p[ind]
