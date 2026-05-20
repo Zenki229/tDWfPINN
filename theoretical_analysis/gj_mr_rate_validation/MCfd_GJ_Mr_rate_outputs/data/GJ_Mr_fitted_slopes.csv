@@ -1,0 +1,7 @@
+experiment,alpha,label,target_rate,fitted_slope,r2,fit_min,fit_max
+abstract weighted kernel,1.5,r≈2 (nu=1.0),2.0,-1.9179692923607716,0.8144671778234867,16,128
+abstract weighted kernel,1.5,r≈3 (nu=2.2),3.0,-3.032051228072514,0.8268704002767081,16,128
+abstract weighted kernel,1.5,r≈4 (nu=3.2),4.0,-4.043450602939525,0.8358876571773635,16,128
+derivative-level Type-I,1.5,r≈2 (beta=2.1),2.0,-2.1952867452260896,0.9225195312960782,16,128
+derivative-level Type-I,1.5,r≈3 (beta=3.1),3.0,-3.0514289590533714,0.8503489077938133,16,128
+derivative-level Type-I,1.5,r≈4 (beta=4.1),4.0,-4.006741947021373,0.961797504667739,16,128

@@ -1,0 +1,5 @@
+case,alpha,source,gif,frames,x_points,t_min,t_max
+burgers,1.25,data\burgers_125.npz,data\reference_1d\burgers_alpha1p25_reference.gif,121,200,0.0,1.2
+burgers,1.50,data\burgers_150.npz,data\reference_1d\burgers_alpha1p50_reference.gif,121,200,0.0,1.2
+burgers,1.75,data\burgers_175.npz,data\reference_1d\burgers_alpha1p75_reference.gif,121,200,0.0,1.2
+forward,1.75,analytic Mittag-Leffler solution,data\reference_1d\forward_alpha1p75_reference.gif,121,401,0.0,2.0

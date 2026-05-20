@@ -301,20 +301,12 @@ class JAXIrregularHoleDW(JAXIrregularDWBase):
 
 
 class JAXLShapeDW(JAXIrregularDWBase):
-    """L-shaped-domain reference-comparison PDE from lshape_case_package."""
+    """L-shaped-domain constant-coefficient reference-comparison PDE."""
 
     def __init__(self, config, weighting_config=None):
         super().__init__(config, weighting_config)
-        self.diffusion_amp = float(getattr(config, "diffusion_amp", 0.25))
+        self.diffusion_scale = float(getattr(config, "diffusion_scale", 1.0))
         self.velocity_scale = float(getattr(config, "velocity_scale", 0.2))
-
-    def diffusion_coeff(self, x, y):
-        return 1.0 + self.diffusion_amp * jnp.sin(jnp.pi * x) * jnp.cos(jnp.pi * y)
-
-    def grad_diffusion_coeff(self, x, y):
-        ax = self.diffusion_amp * jnp.pi * jnp.cos(jnp.pi * x) * jnp.cos(jnp.pi * y)
-        ay = -self.diffusion_amp * jnp.pi * jnp.sin(jnp.pi * x) * jnp.sin(jnp.pi * y)
-        return ax, ay
 
     def initial_profile(self, x, y):
         return (
@@ -347,9 +339,7 @@ class JAXLShapeDW(JAXIrregularDWBase):
         uyy = vmap(u_yy_fn)(t, x, y).reshape(-1)
         dt_frac = self.compute_frac_diff(apply_fn, params, t, coords, u_val, u_t_fn, key)
 
-        a = self.diffusion_coeff(x, y)
-        ax, ay = self.grad_diffusion_coeff(x, y)
-        div_term = ax * ux + ay * uy + a * (uxx + uyy)
+        div_term = self.diffusion_scale * (uxx + uyy)
         return dt_frac - div_term
 
     def losses(self, apply_fn, params, batch, key):

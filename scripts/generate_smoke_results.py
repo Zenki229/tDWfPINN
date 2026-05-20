@@ -24,6 +24,9 @@ from libs.jax_sample import IrregularHoleSampler, LShapeSampler, TimeSpaceEasySa
 from libs.jax_utils import replicate, unreplicate
 
 
+PAPER_COLORMAP = "jet"
+
+
 def model_cfg(input_dim, hidden_dim=32, num_layers=3):
     return OmegaConf.create({
         "arch_name": "mlp",
@@ -105,26 +108,28 @@ def plot_1d_case(case_name, t_grid, x_grid, true_grid, pred_grid, outdir):
     rel_err = rel_l2(pred_grid, true_grid)
     vmin = float(np.nanmin([np.nanmin(true_grid), np.nanmin(pred_grid)]))
     vmax = float(np.nanmax([np.nanmax(true_grid), np.nanmax(pred_grid)]))
+    err_vmax = float(np.nanmax(err_grid))
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), layout="constrained")
     panels = [
-        ("true", true_grid, vmin, vmax, "viridis"),
-        ("sol", pred_grid, vmin, vmax, "viridis"),
-        (f"abs error\nrelative error = {rel_err:.4e}", err_grid, 0.0,
-         float(np.nanmax(err_grid)), "magma"),
+        ("true", "true", true_grid, vmin, vmax, PAPER_COLORMAP),
+        ("sol", "sol", pred_grid, vmin, vmax, PAPER_COLORMAP),
+        ("abs_error", f"abs error\nrelative error = {rel_err:.4e}",
+         err_grid, 0.0, err_vmax, PAPER_COLORMAP),
     ]
-    for ax, (title, values, lo, hi, cmap) in zip(axes, panels):
+    paths = []
+    for suffix, title, values, lo, hi, cmap in panels:
+        fig, ax = plt.subplots(figsize=(6.4, 4.8), layout="constrained")
         pcm = ax.pcolormesh(t_grid, x_grid, values, shading="auto", cmap=cmap,
                             vmin=lo, vmax=hi)
         ax.set_title(title)
         ax.set_xlabel("t")
         ax.set_ylabel("x")
         fig.colorbar(pcm, ax=ax, format="%.2e")
-
-    path = outdir / f"{case_name}_smoke.png"
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return path, rel_err
+        path = outdir / f"{case_name}_{suffix}_smoke.png"
+        fig.savefig(path, dpi=180)
+        plt.close(fig)
+        paths.append(path)
+    return paths, rel_err
 
 
 def parse_time_slices(value):
@@ -147,14 +152,16 @@ def plot_2d_time_slice_files(case_name, x_grid, y_grid, true_grids, pred_grids,
         row_valid = np.isfinite(true_grid) & np.isfinite(pred_grid)
         row_rel = rel_l2_or_nan(pred_grid[row_valid], true_grid[row_valid])
         err_vmax = float(np.nanmax(err_grid))
-        fig, axes = plt.subplots(1, 3, figsize=(15, 4.8), layout="constrained")
+        time_token = f"t{time_value:.3f}".replace(".", "p")
         panels = [
-            (f"true, t={time_value:.3f}", true_grid, vmin, vmax, "viridis"),
-            (f"sol, t={time_value:.3f}", pred_grid, vmin, vmax, "viridis"),
-            (f"abs error, t={time_value:.3f}\nrelative error = {format_rel(row_rel)}",
-             err_grid, 0.0, err_vmax, "magma"),
+            ("true", f"true, t={time_value:.3f}", true_grid, vmin, vmax, PAPER_COLORMAP),
+            ("sol", f"sol, t={time_value:.3f}", pred_grid, vmin, vmax, PAPER_COLORMAP),
+            ("abs_error",
+             f"abs error, t={time_value:.3f}\nrelative error = {format_rel(row_rel)}",
+             err_grid, 0.0, err_vmax, PAPER_COLORMAP),
         ]
-        for ax, (title, values, lo, hi, cmap) in zip(axes, panels):
+        for suffix, title, values, lo, hi, cmap in panels:
+            fig, ax = plt.subplots(figsize=(6.4, 4.8), layout="constrained")
             pcm = ax.pcolormesh(x_grid, y_grid, values, shading="auto", cmap=cmap,
                                 vmin=lo, vmax=hi)
             ax.set_title(title)
@@ -162,16 +169,10 @@ def plot_2d_time_slice_files(case_name, x_grid, y_grid, true_grids, pred_grids,
             ax.set_ylabel("y")
             ax.set_aspect("equal", adjustable="box")
             fig.colorbar(pcm, ax=ax, format="%.2e")
-
-        fig.suptitle(
-            f"{case_name} smoke at t={time_value:.3f}, "
-            f"overall relative error = {rel_err:.4e}"
-        )
-        time_token = f"t{time_value:.3f}".replace(".", "p")
-        path = outdir / f"{case_name}_{time_token}_smoke.png"
-        fig.savefig(path, dpi=180)
-        plt.close(fig)
-        paths.append(path)
+            path = outdir / f"{case_name}_{time_token}_{suffix}_smoke.png"
+            fig.savefig(path, dpi=180)
+            plt.close(fig)
+            paths.append(path)
 
     return paths, rel_err
 
@@ -206,8 +207,13 @@ def make_burgers(args):
     true = u_full[np.ix_(xi, ti)]
     points = np.stack([t_grid.ravel(), x_grid.ravel()], axis=1)
     pred = predict(state.apply_fn, state.params, points).reshape(t_grid.shape)
-    path, rel_err = plot_1d_case("burgers", t_grid, x_grid, true, pred, args.outdir)
-    return {"case": "burgers", "path": str(path), "relative_error": rel_err, "loss": loss}
+    paths, rel_err = plot_1d_case("burgers", t_grid, x_grid, true, pred, args.outdir)
+    return {
+        "case": "burgers",
+        "path": ";".join(str(path) for path in paths),
+        "relative_error": rel_err,
+        "loss": loss,
+    }
 
 
 def make_forward(args):
@@ -239,8 +245,13 @@ def make_forward(args):
     points = np.stack([t_grid.ravel(), x_grid.ravel()], axis=1)
     true = pde.exact(points).reshape(t_grid.shape)
     pred = predict(state.apply_fn, state.params, points).reshape(t_grid.shape)
-    path, rel_err = plot_1d_case("forward", t_grid, x_grid, true, pred, args.outdir)
-    return {"case": "forward", "path": str(path), "relative_error": rel_err, "loss": loss}
+    paths, rel_err = plot_1d_case("forward", t_grid, x_grid, true, pred, args.outdir)
+    return {
+        "case": "forward",
+        "path": ";".join(str(path) for path in paths),
+        "relative_error": rel_err,
+        "loss": loss,
+    }
 
 
 def make_irregular_hole(args):
@@ -274,7 +285,7 @@ def make_irregular_hole(args):
 
     true_grids = []
     pred_grids = []
-    times = parse_time_slices(args.time_slices)
+    times = parse_time_slices(args.time_slices) if args.time_slices else [0.5, 1.0]
     for time_value in times:
         points = np.stack([
             np.full(np.count_nonzero(mask), time_value),
@@ -313,19 +324,32 @@ def lshape_reference_slices(args):
     x_grid = data["x_grid"]
     y_grid = data["y_grid"]
     snapshots = data["snapshots"]
+    meta = {
+        "alpha": float(data["alpha"]) if "alpha" in data else 1.5,
+        "diffusion_scale": (
+            float(data["diffusion_scale"]) if "diffusion_scale" in data else 1.0
+        ),
+        "t_final": float(data["t_final"]) if "t_final" in data else float(times[-1]),
+    }
+    requested_times = (
+        parse_time_slices(args.time_slices)
+        if args.time_slices
+        else [0.5 * meta["t_final"], meta["t_final"]]
+    )
     selected = []
-    for requested in parse_time_slices(args.time_slices):
+    for requested in requested_times:
         idx = int(np.argmin(np.abs(times - requested)))
         selected.append((float(times[idx]), snapshots[idx]))
-    return x_grid, y_grid, selected
+    return x_grid, y_grid, selected, meta
 
 
 def make_lshape(args):
+    x_grid, y_grid, selected, meta = lshape_reference_slices(args)
     cfg = OmegaConf.create({
-        "al": 1.5,
-        "tlim": [0, 1],
+        "al": meta["alpha"],
+        "tlim": [0, meta["t_final"]],
         "method": "GJ-II",
-        "diffusion_amp": 0.25,
+        "diffusion_scale": meta["diffusion_scale"],
         "velocity_scale": 0.2,
         "GJ": {"nums": args.quad},
         "MC": {"nums": args.quad, "eps": 1e-8},
@@ -340,7 +364,6 @@ def make_lshape(args):
     )
     state, loss = train_smoke(pde, sampler, 3, args.steps, args.seed)
 
-    x_grid, y_grid, selected = lshape_reference_slices(args)
     true_grids = []
     pred_grids = []
     times = []
@@ -409,7 +432,7 @@ def main():
     parser.add_argument("--batch-init", type=int, default=4)
     parser.add_argument("--grid-1d", type=int, default=80)
     parser.add_argument("--grid-2d", type=int, default=90)
-    parser.add_argument("--time-slices", default="0.50,1.00")
+    parser.add_argument("--time-slices", default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--outdir", type=Path, default=Path("outputs/smoke_results"))
     parser.add_argument("--burgers-data", type=Path, default=Path("data/burgers_150.npz"))

@@ -33,13 +33,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import mpmath as mp
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+try:
+    import imageio.v2 as imageio
+except ModuleNotFoundError:
+    imageio = None
 
 
 def build_lshape_fd(N: int = 81):
@@ -189,6 +193,9 @@ def generate_outputs(outdir: Path = Path("figures"), alpha: float = 1.55, N: int
     plt.close(fig3)
 
     # Heatmap GIF over time.
+    if imageio is None:
+        raise RuntimeError("imageio is required to generate the L-shape GIF outputs")
+
     t_values = np.linspace(0.0, 1.0, 31)
     frames_data = [solution_grid(t) for t in t_values]
     finite_vals = np.concatenate([U[np.isfinite(U)] for U in frames_data])

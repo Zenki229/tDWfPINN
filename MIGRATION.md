@@ -77,8 +77,12 @@ The L-shaped reference solution is stored in `data/lshape/lshape_reference.npz`,
 with an accompanying GIF at `data/lshape/lshape_reference.gif`. Regenerate both
 with:
 ```bash
-python scripts/generate_lshape_reference.py
+python reference_solvers/lshape_2d/generate_lshape_reference.py
 ```
+The generator uses `alpha=1.8`, `t in [0, 5]`, constant diffusion scale `0.25`,
+L-shaped finite-difference eigenmodes, and backward-Euler convolution quadrature
+for the fractional modal coefficients. The matching training PDE is
+`D_t^1.8 u - 0.25 Delta u = 0`.
 
 To regenerate the four smoke figures under `outputs/smoke_results/`, run:
 ```bash
@@ -87,8 +91,9 @@ python scripts/generate_smoke_results.py --case forward
 python scripts/generate_smoke_results.py --case irregular_hole
 python scripts/generate_smoke_results.py --case lshape
 ```
-The two-dimensional smoke figures use separate `x-y` heatmaps at `t=T/2`
-and `t=T` by default.
+The smoke generator writes each `true`, `sol`, and `abs_error` panel as an
+independent PNG. The two-dimensional cases use separate `x-y` heatmaps at
+`t=T/2` and `t=T` by default.
 
 ## Timing
 JAX training scripts record paper-style timing by default. A timing epoch is

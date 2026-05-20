@@ -44,7 +44,7 @@ def _lshape_cfg(method="GJ-II"):
         "al": 1.5,
         "tlim": [0, 1],
         "method": method,
-        "diffusion_amp": 0.25,
+        "diffusion_scale": 0.25,
         "velocity_scale": 0.2,
         "GJ": {"nums": 3},
         "MC": {"nums": 3, "eps": 1e-8},

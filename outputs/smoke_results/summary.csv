@@ -1,5 +1,5 @@
 case,relative_error,final_smoke_loss,figure
-forward,1.00149905e+00,6.65842593e-01,outputs\smoke_results\forward_smoke.png
-burgers,9.09524112e-01,3.30018520e+00,outputs\smoke_results\burgers_smoke.png
-irregular_hole,3.97507033e+00,8.29563439e-02,outputs\smoke_results\irregular_hole_t0p500_smoke.png;outputs\smoke_results\irregular_hole_t1p000_smoke.png
-lshape,1.85527354e+00,1.92196220e-02,outputs\smoke_results\lshape_t0p500_smoke.png;outputs\smoke_results\lshape_t1p000_smoke.png
+burgers,9.09524112e-01,3.30018520e+00,outputs\smoke_results\burgers_true_smoke.png;outputs\smoke_results\burgers_sol_smoke.png;outputs\smoke_results\burgers_abs_error_smoke.png
+forward,1.00149905e+00,6.65842593e-01,outputs\smoke_results\forward_true_smoke.png;outputs\smoke_results\forward_sol_smoke.png;outputs\smoke_results\forward_abs_error_smoke.png
+irregular_hole,3.97507033e+00,8.29563439e-02,outputs\smoke_results\irregular_hole_t0p500_true_smoke.png;outputs\smoke_results\irregular_hole_t0p500_sol_smoke.png;outputs\smoke_results\irregular_hole_t0p500_abs_error_smoke.png;outputs\smoke_results\irregular_hole_t1p000_true_smoke.png;outputs\smoke_results\irregular_hole_t1p000_sol_smoke.png;outputs\smoke_results\irregular_hole_t1p000_abs_error_smoke.png
+lshape,1.31243028e+00,4.68095019e-02,outputs\smoke_results\lshape_t2p500_true_smoke.png;outputs\smoke_results\lshape_t2p500_sol_smoke.png;outputs\smoke_results\lshape_t2p500_abs_error_smoke.png;outputs\smoke_results\lshape_t5p000_true_smoke.png;outputs\smoke_results\lshape_t5p000_sol_smoke.png;outputs\smoke_results\lshape_t5p000_abs_error_smoke.png

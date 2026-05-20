@@ -1,11 +1,11 @@
 name: lshape
 
-# L-shaped reference-comparison benchmark from lshape_case_package.
-al: 1.5
-tlim: [0, 1]
+# L-shaped reference-comparison benchmark from reference_solvers/lshape_2d.
+al: 1.8
+tlim: [0, 5]
 method: GJ-II
 
-diffusion_amp: 0.25
+diffusion_scale: 0.25
 velocity_scale: 0.2
 reference_data: data/lshape/lshape_reference.npz
 reference_gif: data/lshape/lshape_reference.gif
