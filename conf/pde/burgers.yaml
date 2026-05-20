@@ -1,4 +1,4 @@
-name: debug_eg1
+name: burgers
 al: 1.5
 beta: 2.0
 xlim: [[-1, 1]]

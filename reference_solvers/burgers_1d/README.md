@@ -1,7 +1,9 @@
-# 1D Burgers Reference Solver
+# 1D Burgers Reference GIFs
 
-This folder contains the numerical reference code for the one-dimensional
-time-fractional Burgers benchmark:
+This folder contains the GIF generator for the stored one-dimensional
+time-fractional Burgers numerical references.
+
+## PDE
 
 ```text
 {}^C D_t^alpha u + u u_x - (0.01 / pi) u_xx = 0,
@@ -11,15 +13,38 @@ u(0, x) = -sin(pi x)
 u_t(0, x) = beta sin(pi x)
 ```
 
-The time discretization uses backward-Euler convolution quadrature weights for
-the Caputo term. The spatial discretization code is kept here with the WENO and
-Lax-Friedrichs components used by the existing Burgers reference data.
+The currently stored references in `data/burgers_125.npz`,
+`data/burgers_150.npz`, and `data/burgers_175.npz` are numerical references,
+not analytic solutions. They use zero initial velocity, `beta=0.0`, on a
+`200 x 200` `(t, x)` grid.
 
-Generate GIFs from the stored `data/burgers_*.npz` numerical references with:
+The reference solver code kept here uses backward-Euler convolution quadrature
+for the Caputo term, with WENO/Lax-Friedrichs components retained for the
+Burgers spatial discretization.
+
+## Generate
+
+From the repository root:
 
 ```bash
-conda run -n sciml python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py
+python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py
 ```
 
-The GIF generator detects the correct data orientation from the initial
-condition `u(0,x)=-sin(pi x)`.
+To specify the source arrays explicitly:
+
+```bash
+python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py --burgers-data data/burgers_125.npz data/burgers_150.npz data/burgers_175.npz
+```
+
+Outputs:
+
+```text
+data/reference_1d/burgers_alpha1p25_reference.gif
+data/reference_1d/burgers_alpha1p50_reference.gif
+data/reference_1d/burgers_alpha1p75_reference.gif
+data/reference_1d/burgers_reference_summary.csv
+```
+
+The generator detects the correct array orientation from
+`u(0,x)=-sin(pi x)` before drawing frames. This prevents square-array transpose
+mistakes when reading the stored `npz` files.

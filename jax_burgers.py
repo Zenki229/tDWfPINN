@@ -68,9 +68,9 @@ def main(cfg: DictConfig):
         getattr(cfg.training, "update_weights_every_steps", 500),
     )
     weighting_scheme = getattr(cfg.weighting, "scheme", "none")
-    workdir = os.getcwd()
-    timing_dir = HydraConfig.get().runtime.output_dir
-    timer = EpochTimer.from_config(cfg.training, timing_dir)
+    workdir = HydraConfig.get().runtime.output_dir
+    os.makedirs(workdir, exist_ok=True)
+    timer = EpochTimer.from_config(cfg.training, workdir)
 
     print(f"[*] Training {max_steps} steps, log every {log_every}")
     print(f"[*] Workdir: {workdir}")

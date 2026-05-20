@@ -38,4 +38,4 @@ saving:
 
 hydra:
   run:
-    dir: outputs/${pde.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/${pde.name}/${now:%Y-%m-%d_%H-%M-%S}
