@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 Self-contained finite-difference eigenmode reference generator for an L-shaped
 fractional diffusion-wave benchmark.
 
@@ -46,7 +46,7 @@ except ModuleNotFoundError:
     imageio = None
 
 
-def build_lshape_fd(N: int = 81):
+def build_lshape_fd(N: int = 128):
     """Build a five-point finite-difference Laplacian on an L-shaped domain."""
     xs = np.linspace(-1.0, 1.0, N)
     ys = np.linspace(-1.0, 1.0, N)
@@ -103,7 +103,7 @@ def mittag_leffler(z: float, alpha: float, beta: float = 1.0, tol: float = 1e-12
     return float(s)
 
 
-def make_reference(alpha: float = 1.55, N: int = 81, nmodes: int = 36):
+def make_reference(alpha: float = 1.55, N: int = 128, nmodes: int = 36):
     """Compute eigenmodes and modal coefficients for the reference solution."""
     xs, ys, X, Y, visible_domain, pts, K = build_lshape_fd(N)
     eigs, modes = spla.eigsh(K, k=nmodes, which="SM", tol=1e-7)
@@ -141,7 +141,7 @@ def make_reference(alpha: float = 1.55, N: int = 81, nmodes: int = 36):
     return xs, ys, X, Y, visible_domain, eigs, modes, coeff_g, coeff_gt, solution_grid
 
 
-def generate_outputs(outdir: Path = Path("figures"), alpha: float = 1.55, N: int = 81, nmodes: int = 36):
+def generate_outputs(outdir: Path = Path("figures"), alpha: float = 1.55, N: int = 128, nmodes: int = 36):
     outdir.mkdir(parents=True, exist_ok=True)
     xs, ys, X, Y, visible_domain, eigs, modes, coeff_g, coeff_gt, solution_grid = make_reference(alpha, N, nmodes)
 

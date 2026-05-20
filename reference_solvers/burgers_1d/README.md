@@ -14,3 +14,12 @@ u_t(0, x) = beta sin(pi x)
 The time discretization uses backward-Euler convolution quadrature weights for
 the Caputo term. The spatial discretization code is kept here with the WENO and
 Lax-Friedrichs components used by the existing Burgers reference data.
+
+Generate GIFs from the stored `data/burgers_*.npz` numerical references with:
+
+```bash
+conda run -n sciml python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py
+```
+
+The GIF generator detects the correct data orientation from the initial
+condition `u(0,x)=-sin(pi x)`.

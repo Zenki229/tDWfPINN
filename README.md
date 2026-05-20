@@ -128,8 +128,7 @@ Finite-smoothness GJ rate:
 ### Two-Dimensional PDEs
 
 Both two-dimensional benchmarks are treated as numerical-reference cases. The
-GIFs and the specific numerical-reference generation commands will be
-documented after the reference workflow is fixed.
+PDE-specific reference and GIF generators live under `reference_solvers/`.
 
 #### Circular-Hole Irregular Domain
 
@@ -152,9 +151,10 @@ b(x, y) = (1 + y, x - 1)
 lambda = 1
 ```
 
-Here `f(t, x, y)` is the prescribed source term for this benchmark; the
-numerical reference data path will be specified after the two-dimensional
-reference solver is finalized.
+Here `f(t, x, y)` is the prescribed source term for this benchmark. The
+manufactured analytic solution used for diagnostics and the exact GIF is
+`u*(t,x,y)=t^2(1-t)^2 phi(x,y)`, where `phi` is the boundary-vanishing spatial
+factor in `reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py`.
 
 #### L-Shaped Domain
 
@@ -180,13 +180,15 @@ g(x, y) =
 
 ### One-Dimensional Reference Solutions
 
-All one-dimensional reference GIFs can be regenerated with:
+All one-dimensional reference GIF generation code lives in the corresponding
+PDE folders under `reference_solvers/`:
 
 ```bash
-conda run -n sciml python scripts/generate_1d_reference_gifs.py
+conda run -n sciml python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py
+conda run -n sciml python reference_solvers/forward_1d/generate_forward_reference_gif.py
 ```
 
-This command writes four GIFs and a summary CSV under `data/reference_1d/`.
+These commands write GIFs and summary CSVs under `data/reference_1d/`.
 
 #### Burgers Numerical References
 
@@ -210,8 +212,11 @@ directly against them. The Burgers numerical reference code is collected in
 those numerical reference arrays with:
 
 ```bash
-conda run -n sciml python scripts/generate_1d_reference_gifs.py --skip-forward --burgers-data data/burgers_125.npz data/burgers_150.npz data/burgers_175.npz
+conda run -n sciml python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py --burgers-data data/burgers_125.npz data/burgers_150.npz data/burgers_175.npz
 ```
+
+The generator detects the correct `(t, x)` orientation from
+`u(0, x)=-sin(pi x)`, which avoids the ambiguous square-array transpose issue.
 
 | Alpha | Numerical reference data | GIF |
 | --- | --- | --- |
@@ -249,7 +254,7 @@ For the paper Section 4.3 setting, `alpha=1.75`, `lambda=1`, `k=1`,
 `a=1`, and `b=-0.5`. Regenerate only this analytic reference GIF with:
 
 ```bash
-conda run -n sciml python scripts/generate_1d_reference_gifs.py --skip-burgers --forward-alpha 1.75 --forward-lambda 1.0 --forward-k 1 --forward-a 1.0 --forward-b -0.5 --forward-t-max 2.0 --forward-x-points 401
+conda run -n sciml python reference_solvers/forward_1d/generate_forward_reference_gif.py --alpha 1.75 --lam 1.0 --k 1 --a 1.0 --b -0.5 --t-max 2.0 --x-points 401
 ```
 
 ![Forward alpha 1.75](data/reference_1d/forward_alpha1p75_reference.gif)
@@ -262,6 +267,29 @@ The generated one-dimensional references are summarized by:
 | `data/reference_1d/burgers_alpha1p50_reference.gif` | `data/burgers_150.npz` |
 | `data/reference_1d/burgers_alpha1p75_reference.gif` | `data/burgers_175.npz` |
 | `data/reference_1d/forward_alpha1p75_reference.gif` | analytic Mittag-Leffler solution on a dense 401-point x-grid |
+
+### Two-Dimensional Reference GIFs
+
+L-shaped-domain GIF generation is handled by:
+
+```bash
+conda run -n sciml python reference_solvers/lshape_2d/generate_lshape_reference.py
+```
+
+For the circular-hole case, the same PDE-specific generator writes both the
+finite-difference numerical reference GIF and the analytic manufactured-solution
+GIF:
+
+```bash
+conda run -n sciml python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py
+```
+
+Outputs:
+
+| Reference | Source |
+| --- | --- |
+| `data/irregular_hole/irregular_hole_reference.gif` | masked finite-difference reference with backward-Euler CQ |
+| `data/irregular_hole/irregular_hole_exact.gif` | analytic manufactured solution `u*(t,x,y)=q(t)phi(x,y)` |
 
 ## Training
 

@@ -7,8 +7,9 @@ generation and independent reference calculations.
 | Path | Role |
 | --- | --- |
 | `burgers_1d/` | Backward-Euler convolution-quadrature and WENO-style code used to produce one-dimensional fractional Burgers numerical references. |
+| `forward_1d/` | Analytic Mittag-Leffler reference GIF generator for the one-dimensional forward problem. |
 | `lshape_2d/` | L-shaped-domain finite-difference/FEM reference package plus the current backward-Euler CQ reference generator. |
-| `irregular_hole_2d/` | Placeholder for the circular-hole two-dimensional numerical reference generator that will replace the current manufactured-reference evaluation path. |
+| `irregular_hole_2d/` | Circular-hole reference solver plus analytic manufactured-solution GIF generation. |
 
-The GIF-generation scripts and exact solver commands will be documented after
-the reference-data workflow is finalized.
+All reference GIF generation code should live in the PDE-specific folder here,
+not in the top-level `scripts/` directory.

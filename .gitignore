@@ -17,6 +17,7 @@ __pycache__/
 !outputs/smoke_results/*.png
 !theoretical_analysis/**/*.png
 !reference_solvers/**/*.png
+theoretical_analysis/**/*.md
 theoretical_analysis/reviewer_ready_validation_section/
 *.pdf
 

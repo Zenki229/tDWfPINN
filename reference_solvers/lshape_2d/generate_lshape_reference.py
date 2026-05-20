@@ -209,7 +209,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--alpha", type=float, default=1.8)
     parser.add_argument("--diffusion-scale", type=float, default=0.25)
-    parser.add_argument("--n-grid", type=int, default=81)
+    parser.add_argument("--n-grid", type=int, default=128)
     parser.add_argument("--n-modes", type=int, default=36)
     parser.add_argument("--n-frames", type=int, default=81)
     parser.add_argument("--n-steps", type=int, default=2000)
