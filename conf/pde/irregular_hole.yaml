@@ -1,0 +1,29 @@
+_target_: src.physics.irregular_2d.IrregularHole2D
+name: irregular_hole
+input_dim: 3
+
+# Circular-hole manufactured benchmark.
+alpha: 1.5
+t_lim: [0, 1]
+method: "GJ-II"
+
+center: [-0.3, 0.2]
+r0: 0.25
+lam: 1.0
+diffusion_amp: 0.3
+plot_grid: 80
+plot_time_slices: [0.5, 1.0]
+
+monte_carlo_params:
+  nums: 640
+  eps: 1.0e-8
+gauss_jacobi_params:
+  nums: 64
+gj_params:
+  nums: 64
+
+weights:
+  domain: 1.0
+  boundary: 1.0
+  initial: 1.0
+  initial_dt: 1.0

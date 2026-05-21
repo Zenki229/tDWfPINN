@@ -1,0 +1,6 @@
+numpy
+scipy
+matplotlib
+mpmath
+imageio
+scikit-fem

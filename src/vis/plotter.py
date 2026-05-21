@@ -47,6 +47,42 @@ class BasePlotter:
             return int(self.cfg.plot.dpi)
         return 100
 
+    def plot_2d_field(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        values: np.ndarray,
+        title: str,
+        name: str,
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None,
+        cmap: str = "jet",
+    ):
+        self.save_state(name, {"x": x, "y": y, "values": values})
+        font_size = self._resolve_font_size(None)
+        plt.rcParams.update({"font.size": font_size})
+        cmap_obj = plt.get_cmap(cmap).copy()
+        cmap_obj.set_bad("white")
+        fig, ax = plt.subplots(layout="constrained", figsize=(6.4, 4.8))
+        mesh = ax.pcolormesh(
+            x,
+            y,
+            np.ma.masked_invalid(values),
+            shading="gouraud",
+            cmap=cmap_obj,
+            vmin=vmin,
+            vmax=vmax,
+        )
+        fig.colorbar(mesh, ax=ax, format="%1.1e")
+        ax.set_title(title)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_aspect("equal", adjustable="box")
+        if self._jpg_enabled():
+            jpg_path = os.path.join(self.img_dir, f"{name}.jpg")
+            fig.savefig(jpg_path, dpi=self._resolve_dpi())
+        plt.close(fig)
+
 
 class PlotlyPlotter(BasePlotter):
     def _save_figure(self, fig: go.Figure, filename_base: str):

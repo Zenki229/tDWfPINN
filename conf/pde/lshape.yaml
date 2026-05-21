@@ -1,0 +1,28 @@
+_target_: src.physics.irregular_2d.LShape2D
+name: lshape
+input_dim: 3
+
+# L-shaped reference-comparison benchmark.
+alpha: 1.8
+t_lim: [0, 1]
+method: "GJ-II"
+
+diffusion_scale: 0.25
+velocity_scale: 0.2
+reference_data: data/lshape/lshape_reference.npz
+plot_grid: 128
+plot_time_slices: [0.5, 1.0]
+
+monte_carlo_params:
+  nums: 640
+  eps: 1.0e-8
+gauss_jacobi_params:
+  nums: 64
+gj_params:
+  nums: 64
+
+weights:
+  domain: 1.0
+  boundary: 1.0
+  initial: 1.0
+  initial_dt: 1.0

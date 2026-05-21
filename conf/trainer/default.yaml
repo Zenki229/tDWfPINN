@@ -1,4 +1,7 @@
 max_steps: 2000
+timing:
+  enabled: true
+  epoch_steps: 5000
 batch_size:
   domain: 100
   boundary: 10
