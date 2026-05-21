@@ -10,6 +10,7 @@ __pycache__/
 **/results/
 **/outputs/
 !outputs/
+outputs/stress_results/
 !outputs/smoke_results/
 !outputs/smoke_results/*.png
 !outputs/smoke_results/summary.csv

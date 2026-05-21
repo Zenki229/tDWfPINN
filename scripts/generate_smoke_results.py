@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import sys
+import time
 from pathlib import Path
 
 import matplotlib
@@ -25,6 +26,7 @@ from libs.jax_utils import replicate, unreplicate
 
 
 PAPER_COLORMAP = "jet"
+PAPER_SHADING = "gouraud"
 
 
 def model_cfg(input_dim, hidden_dim=32, num_layers=3):
@@ -87,20 +89,36 @@ def predict(apply_fn, params, points, chunk_size=2048):
     return np.concatenate(vals, axis=0)
 
 
-def train_smoke(pde, sampler, input_dim, steps, seed):
+def train_smoke(pde, sampler, input_dim, steps, seed, hidden_dim=32, num_layers=3):
     key = jax.random.PRNGKey(seed)
     key, model_key = jax.random.split(key)
-    state = create_train_state(model_key, model_cfg(input_dim), optim_cfg(), weighting_cfg())
+    state = create_train_state(
+        model_key,
+        model_cfg(input_dim, hidden_dim=hidden_dim, num_layers=num_layers),
+        optim_cfg(),
+        weighting_cfg(),
+    )
     state = replicate(state)
     keys = jax.random.split(key, jax.local_device_count())
 
-    last_loss = np.nan
+    last_loss_val = None
+    start = time.perf_counter()
     for _ in range(steps):
         batch = next(sampler)
         state, loss_val, aux, keys = pde.step(state, batch, keys)
-        last_loss = float(jnp.mean(loss_val))
+        last_loss_val = loss_val
 
-    return unreplicate(state), last_loss
+    if last_loss_val is None:
+        last_loss = np.nan
+    else:
+        jax.block_until_ready(last_loss_val)
+        last_loss = float(jnp.mean(last_loss_val))
+    elapsed = time.perf_counter() - start
+    return unreplicate(state), last_loss, elapsed
+
+
+def output_case_name(args, default_name):
+    return args.output_prefix if args.output_prefix else default_name
 
 
 def plot_1d_case(case_name, t_grid, x_grid, true_grid, pred_grid, outdir):
@@ -119,7 +137,7 @@ def plot_1d_case(case_name, t_grid, x_grid, true_grid, pred_grid, outdir):
     paths = []
     for suffix, title, values, lo, hi, cmap in panels:
         fig, ax = plt.subplots(figsize=(6.4, 4.8), layout="constrained")
-        pcm = ax.pcolormesh(t_grid, x_grid, values, shading="auto", cmap=cmap,
+        pcm = ax.pcolormesh(t_grid, x_grid, values, shading=PAPER_SHADING, cmap=cmap,
                             vmin=lo, vmax=hi)
         ax.set_title(title)
         ax.set_xlabel("t")
@@ -162,7 +180,7 @@ def plot_2d_time_slice_files(case_name, x_grid, y_grid, true_grids, pred_grids,
         ]
         for suffix, title, values, lo, hi, cmap in panels:
             fig, ax = plt.subplots(figsize=(6.4, 4.8), layout="constrained")
-            pcm = ax.pcolormesh(x_grid, y_grid, values, shading="auto", cmap=cmap,
+            pcm = ax.pcolormesh(x_grid, y_grid, values, shading=PAPER_SHADING, cmap=cmap,
                                 vmin=lo, vmax=hi)
             ax.set_title(title)
             ax.set_xlabel("x")
@@ -185,7 +203,7 @@ def make_burgers(args):
         "beta": 2.0,
         "xlim": [[float(x_full[0]), float(x_full[-1])]],
         "tlim": [float(t_full[0]), float(t_full[-1])],
-        "method": "GJ-II",
+        "method": args.method,
         "GJ": {"nums": args.quad},
         "MC": {"nums": args.quad, "eps": 1e-8},
     })
@@ -197,7 +215,15 @@ def make_burgers(args):
         n_devices=jax.local_device_count(),
         shard=True,
     )
-    state, loss = train_smoke(pde, sampler, 2, args.steps, args.seed)
+    state, loss, elapsed = train_smoke(
+        pde,
+        sampler,
+        2,
+        args.steps,
+        args.seed,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+    )
 
     u_full = data["u"].T
     ti = np.unique(np.linspace(0, len(t_full) - 1, args.grid_1d, dtype=int))
@@ -207,12 +233,15 @@ def make_burgers(args):
     true = u_full[np.ix_(xi, ti)]
     points = np.stack([t_grid.ravel(), x_grid.ravel()], axis=1)
     pred = predict(state.apply_fn, state.params, points).reshape(t_grid.shape)
-    paths, rel_err = plot_1d_case("burgers", t_grid, x_grid, true, pred, args.outdir)
+    case_name = output_case_name(args, "burgers")
+    paths, rel_err = plot_1d_case(case_name, t_grid, x_grid, true, pred, args.outdir)
     return {
         "case": "burgers",
+        "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
         "loss": loss,
+        "elapsed_seconds": elapsed,
     }
 
 
@@ -225,7 +254,7 @@ def make_forward(args):
         "b": -0.5,
         "xlim": [[0, 1]],
         "tlim": [0, 2],
-        "method": "GJ-II",
+        "method": args.method,
         "GJ": {"nums": args.quad},
         "MC": {"nums": args.quad, "eps": 1e-8},
     })
@@ -237,7 +266,15 @@ def make_forward(args):
         n_devices=jax.local_device_count(),
         shard=True,
     )
-    state, loss = train_smoke(pde, sampler, 2, args.steps, args.seed)
+    state, loss, elapsed = train_smoke(
+        pde,
+        sampler,
+        2,
+        args.steps,
+        args.seed,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+    )
 
     t = np.linspace(cfg.tlim[0], cfg.tlim[1], args.grid_1d)
     x = np.linspace(cfg.xlim[0][0], cfg.xlim[0][1], args.grid_1d)
@@ -245,12 +282,15 @@ def make_forward(args):
     points = np.stack([t_grid.ravel(), x_grid.ravel()], axis=1)
     true = pde.exact(points).reshape(t_grid.shape)
     pred = predict(state.apply_fn, state.params, points).reshape(t_grid.shape)
-    paths, rel_err = plot_1d_case("forward", t_grid, x_grid, true, pred, args.outdir)
+    case_name = output_case_name(args, "forward")
+    paths, rel_err = plot_1d_case(case_name, t_grid, x_grid, true, pred, args.outdir)
     return {
         "case": "forward",
+        "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
         "loss": loss,
+        "elapsed_seconds": elapsed,
     }
 
 
@@ -258,7 +298,7 @@ def make_irregular_hole(args):
     cfg = OmegaConf.create({
         "al": 1.5,
         "tlim": [0, 1],
-        "method": "GJ-II",
+        "method": args.method,
         "center": [-0.3, 0.2],
         "r0": 0.25,
         "lam": 1.0,
@@ -276,7 +316,15 @@ def make_irregular_hole(args):
         seed=args.seed,
         shard=True,
     )
-    state, loss = train_smoke(pde, sampler, 3, args.steps, args.seed)
+    state, loss, elapsed = train_smoke(
+        pde,
+        sampler,
+        3,
+        args.steps,
+        args.seed,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+    )
 
     grid = np.linspace(-1.0, 1.0, args.grid_2d)
     x_grid, y_grid = np.meshgrid(grid, grid, indexing="xy")
@@ -302,7 +350,7 @@ def make_irregular_hole(args):
         pred_grids.append(pred_grid)
 
     paths, rel_err = plot_2d_time_slice_files(
-        "irregular_hole",
+        output_case_name(args, "irregular_hole"),
         x_grid,
         y_grid,
         true_grids,
@@ -312,9 +360,11 @@ def make_irregular_hole(args):
     )
     return {
         "case": "irregular_hole",
+        "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
         "loss": loss,
+        "elapsed_seconds": elapsed,
     }
 
 
@@ -348,7 +398,7 @@ def make_lshape(args):
     cfg = OmegaConf.create({
         "al": meta["alpha"],
         "tlim": [0, meta["t_final"]],
-        "method": "GJ-II",
+        "method": args.method,
         "diffusion_scale": meta["diffusion_scale"],
         "velocity_scale": 0.2,
         "GJ": {"nums": args.quad},
@@ -362,7 +412,15 @@ def make_lshape(args):
         seed=args.seed,
         shard=True,
     )
-    state, loss = train_smoke(pde, sampler, 3, args.steps, args.seed)
+    state, loss, elapsed = train_smoke(
+        pde,
+        sampler,
+        3,
+        args.steps,
+        args.seed,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+    )
 
     true_grids = []
     pred_grids = []
@@ -382,7 +440,7 @@ def make_lshape(args):
         times.append(time_value)
 
     paths, rel_err = plot_2d_time_slice_files(
-        "lshape",
+        output_case_name(args, "lshape"),
         x_grid,
         y_grid,
         true_grids,
@@ -392,9 +450,11 @@ def make_lshape(args):
     )
     return {
         "case": "lshape",
+        "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
         "loss": loss,
+        "elapsed_seconds": elapsed,
     }
 
 
@@ -427,9 +487,14 @@ def main():
                         required=True)
     parser.add_argument("--steps", type=int, default=5)
     parser.add_argument("--quad", type=int, default=3)
+    parser.add_argument("--method", choices=["GJ-I", "GJ-II", "MC-I", "MC-II"],
+                        default="GJ-II")
+    parser.add_argument("--output-prefix", default=None)
     parser.add_argument("--batch-in", type=int, default=8)
     parser.add_argument("--batch-bd", type=int, default=4)
     parser.add_argument("--batch-init", type=int, default=4)
+    parser.add_argument("--hidden-dim", type=int, default=32)
+    parser.add_argument("--num-layers", type=int, default=3)
     parser.add_argument("--grid-1d", type=int, default=80)
     parser.add_argument("--grid-2d", type=int, default=90)
     parser.add_argument("--time-slices", default=None)
@@ -450,8 +515,10 @@ def main():
     row = makers[args.case](args)
     summary = write_summary(args.outdir, row)
     print(f"case={row['case']}")
+    print(f"method={row['method']}")
     print(f"relative_error={row['relative_error']:.8e}")
     print(f"final_smoke_loss={row['loss']:.8e}")
+    print(f"elapsed_seconds={row['elapsed_seconds']:.8f}")
     print(f"figure={row['path']}")
     print(f"summary={summary}")
 

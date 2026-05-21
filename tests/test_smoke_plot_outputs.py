@@ -7,6 +7,7 @@ import numpy as np
 
 from scripts.generate_smoke_results import (
     PAPER_COLORMAP,
+    PAPER_SHADING,
     lshape_reference_slices,
     plot_1d_case,
     plot_2d_time_slice_files,
@@ -15,6 +16,7 @@ from scripts.generate_smoke_results import (
 
 def test_smoke_plots_use_paper_colormap():
     assert PAPER_COLORMAP == "jet"
+    assert PAPER_SHADING == "gouraud"
 
 
 def test_1d_smoke_panels_are_written_separately(tmp_path):

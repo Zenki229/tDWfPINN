@@ -196,7 +196,7 @@ def render_frame(
         x_grid,
         y_grid,
         values,
-        shading="auto",
+        shading="gouraud",
         cmap=cmap,
         vmin=vmin,
         vmax=vmax,

@@ -91,7 +91,7 @@ def render_frame(x_grid, y_grid, u_grid, t_value, vmin, vmax, alpha, diffusion_s
         x_grid,
         y_grid,
         u_grid,
-        shading="auto",
+        shading="gouraud",
         cmap="jet",
         vmin=vmin,
         vmax=vmax,
