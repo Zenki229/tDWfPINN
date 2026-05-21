@@ -1,0 +1,25 @@
+name: forward
+
+# Section 4.3, equation (72)
+al: 1.75
+k: 1
+lam: 1.0
+a: 1.0
+b: -0.5
+xlim: [[0, 1]]
+tlim: [0, 2]
+
+method: GJ-II
+MC:
+  nums: 80
+  eps: 1.0e-8
+GJ:
+  nums: 80
+
+RAD:
+  use: false
+  ratio: 0.3
+  batch:
+    in: 10000
+    bd: 2
+    init: 2

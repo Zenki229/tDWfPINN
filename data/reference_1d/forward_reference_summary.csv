@@ -1,0 +1,2 @@
+case,alpha,source,gif,frames,x_points,t_min,t_max,lambda,k,a,b
+forward,1.75,analytic Mittag-Leffler solution,data\reference_1d\forward_alpha1p75_reference.gif,121,401,0.0,2.0,1.0,1,1.0,-0.5

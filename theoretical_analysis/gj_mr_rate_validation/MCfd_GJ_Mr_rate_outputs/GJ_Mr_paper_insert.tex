@@ -1,0 +1,26 @@
+\paragraph{Finite-smoothness Gauss--Jacobi rate.}
+The spectral estimate in the analytic case should be understood as a strengthened special case of the finite-smoothness estimate in Theorem~3.3.  To verify the algebraic regime, we additionally test weighted Gauss--Jacobi quadrature for non-analytic transformed kernels.  Specifically, we compute
+\[
+  I_\alpha[\phi]=\int_0^1 \tau^{1-\alpha}\phi(\tau)\,d\tau,
+\]
+with interior algebraic defects in \(\phi\).  These kernels are not analytic, so exponential convergence is not expected.  Instead, the fitted log--log slopes follow the algebraic reference rates \(M^{-r}\), as summarized in Table~\ref{tab:gj_mr_rate}.
+
+\begin{table}[htbp]
+\centering
+\caption{Finite-smoothness Gauss--Jacobi rate check at \(\alpha=1.5\).  Slopes are fitted over \(M=16,\ldots,128\).}
+\label{tab:gj_mr_rate}
+\begin{tabular}{llcc}
+\hline
+Experiment & case & reference rate & fitted slope \\
+\hline
+weighted-kernel test & \(r\approx2\) & \(-2\) & \(-1.92\) \\
+weighted-kernel test & \(r\approx3\) & \(-3\) & \(-3.03\) \\
+weighted-kernel test & \(r\approx4\) & \(-4\) & \(-4.04\) \\
+Type-I derivative test & \(r\approx2\) & \(-2\) & \(-2.20\) \\
+Type-I derivative test & \(r\approx3\) & \(-3\) & \(-3.05\) \\
+Type-I derivative test & \(r\approx4\) & \(-4\) & \(-4.01\) \\
+\hline
+\end{tabular}
+\end{table}
+
+This experiment confirms that the Gauss--Jacobi rule exhibits the predicted algebraic behavior for finitely smooth kernels.  The previously reported \(\rho^{-2M}\) behavior should therefore be interpreted as the analytic-kernel regime, not as the only convergence mechanism of the method.

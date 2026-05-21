@@ -1,0 +1,62 @@
+[
+  {
+    "experiment": "abstract weighted kernel",
+    "alpha": 1.5,
+    "label": "r\u22482 (nu=1.0)",
+    "target_rate": 2.0,
+    "fitted_slope": -1.9179692923607716,
+    "r2": 0.8144671778234867,
+    "fit_min": 16,
+    "fit_max": 128
+  },
+  {
+    "experiment": "abstract weighted kernel",
+    "alpha": 1.5,
+    "label": "r\u22483 (nu=2.2)",
+    "target_rate": 3.0,
+    "fitted_slope": -3.032051228072514,
+    "r2": 0.8268704002767081,
+    "fit_min": 16,
+    "fit_max": 128
+  },
+  {
+    "experiment": "abstract weighted kernel",
+    "alpha": 1.5,
+    "label": "r\u22484 (nu=3.2)",
+    "target_rate": 4.0,
+    "fitted_slope": -4.043450602939525,
+    "r2": 0.8358876571773635,
+    "fit_min": 16,
+    "fit_max": 128
+  },
+  {
+    "experiment": "derivative-level Type-I",
+    "alpha": 1.5,
+    "label": "r\u22482 (beta=2.1)",
+    "target_rate": 2.0,
+    "fitted_slope": -2.1952867452260896,
+    "r2": 0.9225195312960782,
+    "fit_min": 16,
+    "fit_max": 128
+  },
+  {
+    "experiment": "derivative-level Type-I",
+    "alpha": 1.5,
+    "label": "r\u22483 (beta=3.1)",
+    "target_rate": 3.0,
+    "fitted_slope": -3.0514289590533714,
+    "r2": 0.8503489077938133,
+    "fit_min": 16,
+    "fit_max": 128
+  },
+  {
+    "experiment": "derivative-level Type-I",
+    "alpha": 1.5,
+    "label": "r\u22484 (beta=4.1)",
+    "target_rate": 4.0,
+    "fitted_slope": -4.006741947021373,
+    "r2": 0.961797504667739,
+    "fit_min": 16,
+    "fit_max": 128
+  }
+]

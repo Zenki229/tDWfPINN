@@ -1,0 +1,30 @@
+# Optimizer
+optimizer: adam
+learning_rate: 1e-3
+decay_rate: 0.9
+decay_steps: 5000
+beta1: 0.9
+beta2: 0.999
+eps: 1.0e-8
+grad_accum_steps: 1
+
+# Training loop
+max_steps: 10000
+log_every_steps: 100
+save_every_steps: 1000
+update_weights_every_steps: 500
+
+# Paper-style timing: one timing epoch is 5000 optimizer steps.
+timing:
+  enabled: true
+  epoch_steps: 5000
+  filename: timing.csv
+
+# Batch sizes
+batch:
+  in: 1000
+  bd: 100
+  init: 100
+
+# Restore from checkpoint
+restore: false

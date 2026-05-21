@@ -1,0 +1,59 @@
+% Manuscript-ready description for an L-shaped-domain reference experiment.
+% This section is intended to supplement the manufactured 2D irregular-domain case.
+
+\subsection{L-shaped-domain reference experiment}
+\label{subsec:lshape-reference}
+
+To further evaluate the proposed method on a nonconvex irregular geometry, we consider a time-fractional diffusion-wave equation on the standard L-shaped domain
+\begin{equation}
+    \Omega_L = [-1,1]^2 \setminus [0,1]^2 .
+\end{equation}
+Unlike the manufactured examples in the previous sections, we do not impose an artificial closed-form solution on this nonconvex polygonal domain.  Instead, we generate a high-resolution reference solution using a finite-element or finite-difference eigensolver.  This setting is intended to examine whether the proposed transformed formulation remains effective when the geometry is nontrivial and the reference solution is produced by an independent numerical method.
+
+We consider the homogeneous Dirichlet problem
+\begin{equation}
+\begin{aligned}
+    \partial_t^\alpha u - \nabla\cdot(a(x,y)\nabla u) &= 0,
+        && (t,x,y)\in(0,T]\times\Omega_L, \\
+    u &= 0,
+        && (t,x,y)\in(0,T]\times\partial\Omega_L, \\
+    u(0,x,y) &= g(x,y),
+        && (x,y)\in\Omega_L, \\
+    \partial_t u(0,x,y) &= b(x,y),
+        && (x,y)\in\Omega_L,
+\end{aligned}
+\label{eq:lshape-fdw}
+\end{equation}
+where $1<\alpha<2$.  In the heterogeneous-coefficient version, we choose
+\begin{equation}
+    a(x,y)=1+0.25\sin(\pi x)\cos(\pi y),
+\end{equation}
+which satisfies $0.75\le a(x,y)\le 1.25$.  The initial profile is chosen as a smooth localized pulse inside the L-shaped domain; for example,
+\begin{equation}
+\begin{aligned}
+    g(x,y) ={}& \exp\left(-\frac{(x+0.55)^2+(y+0.45)^2}{0.08}\right)
+    -0.85\exp\left(-\frac{(x+0.55)^2+(y-0.45)^2}{0.06}\right) \\
+    &+0.60\exp\left(-\frac{(x-0.45)^2+(y+0.55)^2}{0.06}\right),
+\end{aligned}
+\end{equation}
+and the reference code imposes the homogeneous boundary condition by setting boundary degrees of freedom to zero.  The initial velocity is taken as $b(x,y)=0.2g(x,y)$ in the visualization experiment.
+
+The reference solution is generated from the generalized elliptic eigenproblem
+\begin{equation}
+    K_a \phi_j = \lambda_j M \phi_j,
+\end{equation}
+where
+\begin{equation}
+    (K_a)_{mn}=\int_{\Omega_L} a(x,y)\nabla\varphi_m\cdot\nabla\varphi_n\,dxdy,
+    \qquad
+    M_{mn}=\int_{\Omega_L}\varphi_m\varphi_n\,dxdy .
+\end{equation}
+After projecting the initial data onto the eigenbasis, the zero-forcing fractional diffusion-wave reference solution is represented as
+\begin{equation}
+    u_{\rm ref}(t,x,y)
+    =\sum_{j=1}^{J} c_j E_{\alpha,1}(-\lambda_j t^\alpha)\phi_j(x,y)
+    +\sum_{j=1}^{J} d_j t E_{\alpha,2}(-\lambda_j t^\alpha)\phi_j(x,y),
+\end{equation}
+where $E_{\alpha,\beta}$ is the two-parameter Mittag--Leffler function.  The first term enforces the initial displacement, while the second term accounts for the initial velocity.  The PINN prediction is then evaluated against $u_{\rm ref}$ on a dense test set sampled from $(0,T]\times\Omega_L$.
+
+This experiment complements the manufactured two-dimensional irregular-domain test.  The manufactured problem provides a clean exact-error benchmark, whereas the L-shaped-domain case demonstrates performance on a nonconvex geometry using an independent high-fidelity reference solver.  In the revised manuscript, this example should be presented as a complex-geometry reference comparison rather than as an exact manufactured-solution test.

@@ -1,0 +1,20 @@
+\begin{remark}[Endpoint cancellation as \(\alpha\to2\)]
+The Gauss--Jacobi rule itself should not be interpreted as deteriorating when the numerical error of the raw formulas increases near the second-order limit.  The effect is caused by the algebraic realization of the removable endpoint singularity.  For example, in the exponential benchmark \(f(t)=e^{-t}\), the raw Type-II quotient
+\[
+  \frac{f(t)-f(t-h)-h f'(t)}{h^2},\qquad h=t\tau,
+\]
+subtracts nearly equal \(O(1)\) quantities to produce an \(O(h^2)\) numerator before dividing by \(h^2\).  As \(\alpha\to2\), the Jacobi weight exponent \(1-\alpha\to-1\), and the leftmost Gauss--Jacobi nodes move closer to \(\tau=0\).  Hence the raw quotient becomes increasingly roundoff-sensitive, especially for Type-II.  This is a finite-precision implementation effect, not a contradiction of the quadrature convergence result for the exact endpoint-regular kernel.
+
+In computations, the endpoint-removable quotients should be evaluated by stable formulas.  For \(f(t)=e^{-t}\), for instance,
+\[
+  \frac{f'(t)-f'(t-h)}{(x+1)t}
+  = e^{-t}\frac{\operatorname{expm1}(h)}{(x+1)t},
+  \qquad h=\frac{t(x+1)}2,
+\]
+and
+\[
+  \frac{f(t)-f(t-h)-h f'(t)}{h^2}
+  = -e^{-t}\frac{\operatorname{expm1}(h)-h}{h^2},
+\]
+with their Taylor limits used when \(h\) is below a prescribed threshold.  Finite-precision tests with fp64, fp32, fp16 and fp8-like quantization confirm that lower precision makes the raw-quotient deterioration appear earlier and more severely, whereas the stabilized fp64 realization remains close to the quadrature floor.
+\end{remark}

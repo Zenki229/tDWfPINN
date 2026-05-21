@@ -1,4 +1,9 @@
 # Byte-compiled / optimized / DLL files
+.claude/
+.pytest_cache/
+jaxpi/
+pinns-jax/
+dw_weno/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -13,6 +18,13 @@ __pycache__/
 *.out
 *.toc
 *.png
+!outputs/smoke_results/*.png
+!theoretical_analysis/**/*.png
+!reference_solvers/**/*.png
+theoretical_analysis/**/*.md
+!theoretical_analysis/README.md
+!theoretical_analysis/MCfd_integrated_final_package/README.md
+theoretical_analysis/reviewer_ready_validation_section/
 *.pdf
 
 # C extensions

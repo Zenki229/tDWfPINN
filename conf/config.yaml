@@ -1,24 +1,41 @@
 defaults:
-  - _self_
   - model: mlp
-  - pde: dw_forward
-  - optimizer: default
-  - trainer: default
-  - plot: plotly
+  - pde: forward
+  - training: default
+  - _self_
 
-hydra:
-  job:
-    chdir: true
-  run:
-    dir: outputs/${wandb.project}-${wandb.name}/${now:%Y-%m-%d_%H-%M-%S}
+mode: train
+version: v1
+seed: 42
 
 wandb:
-  project: "tDWfPINN"
+  project: "jax-pinn"
   entity: null
-  mode: "disabled" # Default to disabled for dev, user can enable
-  name: ${pde.method}
-  group: null
+  mode: "online"
 
-seed: 42
-work_dir: ${hydra:runtime.cwd}
-debug: false
+weighting:
+  scheme: grad_norm           # "grad_norm" or "ntk" or "none"
+  init_weights:
+    in: 1.0
+    bd: 1.0
+    init: 1.0
+    init_dt: 1.0
+  momentum: 0.9
+  update_every_steps: 500
+  use_causal: false
+  causal_tol: 1.0
+  num_chunks: 10
+
+logging:
+  log_losses: true
+  log_weights: true
+  log_grads: false
+  log_ntk: false
+
+saving:
+  save_every_steps: 1000
+  num_keep_ckpts: 5
+
+hydra:
+  run:
+    dir: outputs/${pde.name}/${now:%Y-%m-%d_%H-%M-%S}
