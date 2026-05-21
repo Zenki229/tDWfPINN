@@ -62,14 +62,14 @@ def test_2d_smoke_time_slice_panels_are_written_separately(tmp_path):
 
 def test_lshape_default_slices_follow_reference_final_time(tmp_path):
     ref_path = tmp_path / "lshape_reference.npz"
-    times = np.linspace(0.0, 5.0, 11)
+    times = np.linspace(0.0, 1.0, 11)
     x_grid, y_grid = np.meshgrid(np.linspace(-1.0, 1.0, 2), np.linspace(-1.0, 1.0, 2))
     snapshots = np.arange(len(times) * 4, dtype=float).reshape(len(times), 2, 2)
     np.savez(
         ref_path,
         alpha=1.8,
         diffusion_scale=0.25,
-        t_final=5.0,
+        t_final=1.0,
         times=times,
         x_grid=x_grid,
         y_grid=y_grid,
@@ -80,5 +80,5 @@ def test_lshape_default_slices_follow_reference_final_time(tmp_path):
     _, _, selected, meta = lshape_reference_slices(args)
 
     assert meta["alpha"] == 1.8
-    assert meta["t_final"] == 5.0
-    assert [time_value for time_value, _ in selected] == [2.5, 5.0]
+    assert meta["t_final"] == 1.0
+    assert [time_value for time_value, _ in selected] == [0.5, 1.0]

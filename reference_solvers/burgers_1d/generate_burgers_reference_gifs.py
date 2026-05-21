@@ -63,9 +63,8 @@ def relative_l2_error(a, b):
 def orient_burgers_solution(u, x, t):
     """Return u as (time, x), using the initial condition to resolve square data.
 
-    The legacy evaluator in libs/pde_burgers.py stores data["u"] as (t, x) and
-    only transposes it for pcolormesh because np.meshgrid(t, x) has shape
-    (len(x), len(t)). A line-frame GIF at one time level must use u[idx_t, :].
+    The stored reference arrays are interpreted as data["u"] with shape
+    (t, x). A line-frame GIF at one time level must use u[idx_t, :].
     """
     expected_u0 = -np.sin(np.pi * x)
     candidates = []

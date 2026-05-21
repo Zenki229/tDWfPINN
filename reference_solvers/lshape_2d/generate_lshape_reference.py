@@ -123,6 +123,7 @@ def generate_reference(
     t_final,
     outdir,
     output_prefix,
+    save_npz=True,
 ):
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -159,34 +160,35 @@ def generate_reference(
     npz_path = outdir / f"{output_prefix}.npz"
     gif_path = outdir / f"{output_prefix}.gif"
 
-    np.savez_compressed(
-        npz_path,
-        alpha=alpha,
-        diffusion_scale=diffusion_scale,
-        n_grid=n_grid,
-        n_modes=n_modes,
-        n_steps=n_steps,
-        t_final=t_final,
-        time_step=solver_times[1] - solver_times[0],
-        time_method="backward_euler_convolution_quadrature",
-        times=times,
-        solver_times=solver_times,
-        x=xs,
-        y=ys,
-        x_grid=x_grid,
-        y_grid=y_grid,
-        visible_domain=visible_domain,
-        interior_indices=pts,
-        laplacian_lambdas=laplacian_lambdas,
-        lambdas=lambdas,
-        modes=modes,
-        coeff_g=coeff_g,
-        coeff_gt=coeff_gt,
-        bdf_weights=bdf_weights,
-        modal_history=modal_history,
-        frame_modal_coeffs=frame_modal_coeffs,
-        snapshots=snapshots,
-    )
+    if save_npz:
+        np.savez_compressed(
+            npz_path,
+            alpha=alpha,
+            diffusion_scale=diffusion_scale,
+            n_grid=n_grid,
+            n_modes=n_modes,
+            n_steps=n_steps,
+            t_final=t_final,
+            time_step=solver_times[1] - solver_times[0],
+            time_method="backward_euler_convolution_quadrature",
+            times=times,
+            solver_times=solver_times,
+            x=xs,
+            y=ys,
+            x_grid=x_grid,
+            y_grid=y_grid,
+            visible_domain=visible_domain,
+            interior_indices=pts,
+            laplacian_lambdas=laplacian_lambdas,
+            lambdas=lambdas,
+            modes=modes,
+            coeff_g=coeff_g,
+            coeff_gt=coeff_gt,
+            bdf_weights=bdf_weights,
+            modal_history=modal_history,
+            frame_modal_coeffs=frame_modal_coeffs,
+            snapshots=snapshots,
+        )
 
     finite_vals = snapshots[np.isfinite(snapshots)]
     vmin = float(np.min(finite_vals))
@@ -203,7 +205,8 @@ def generate_reference(
         loop=0,
     )
 
-    print(f"saved: {npz_path}")
+    if save_npz:
+        print(f"saved: {npz_path}")
     print(f"saved: {gif_path}")
     print(
         "time method: backward Euler convolution quadrature, "
@@ -221,9 +224,14 @@ def main():
     parser.add_argument("--n-modes", type=int, default=36)
     parser.add_argument("--n-frames", type=int, default=81)
     parser.add_argument("--n-steps", type=int, default=2000)
-    parser.add_argument("--t-final", type=float, default=5.0)
+    parser.add_argument("--t-final", type=float, default=1.0)
     parser.add_argument("--outdir", type=Path, default=Path("data/lshape"))
     parser.add_argument("--output-prefix", default="lshape_reference")
+    parser.add_argument(
+        "--gif-only",
+        action="store_true",
+        help="write only the GIF preview and skip the compressed NPZ archive",
+    )
     parser.add_argument(
         "--tag-alpha",
         action="store_true",
@@ -243,6 +251,7 @@ def main():
         args.t_final,
         args.outdir,
         output_prefix,
+        save_npz=not args.gif_only,
     )
 
 

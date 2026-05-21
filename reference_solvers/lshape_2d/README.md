@@ -11,7 +11,7 @@ the time-fractional modal equations.
 Omega_L = [-1, 1]^2 \ [0, 1]^2
 
 {}^C D_t^1.8 u - 0.25 Delta u = 0,
-    (t, x, y) in (0, 5] x Omega_L
+    (t, x, y) in (0, 1] x Omega_L
 
 u = 0 on partial Omega_L
 u(0, x, y) = g(x, y)
@@ -44,7 +44,7 @@ n_grid = 128
 n_modes = 36
 n_steps = 2000
 n_frames = 81
-T = 5
+T = 1
 ```
 
 The grid size `128` is used as the current balance between reference quality
@@ -62,6 +62,19 @@ Outputs:
 ```text
 data/lshape/lshape_reference.npz
 data/lshape/lshape_reference.gif
+```
+
+The default `T = 1` archive is the reference used by training. The project
+README uses a longer GIF-only preview:
+
+```bash
+python reference_solvers/lshape_2d/generate_lshape_reference.py --t-final 5.0 --output-prefix lshape_reference_T5 --gif-only
+```
+
+Output:
+
+```text
+data/lshape/lshape_reference_T5.gif
 ```
 
 To keep several fractional orders side by side, append an alpha token:

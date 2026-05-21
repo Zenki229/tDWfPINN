@@ -9,6 +9,10 @@ __pycache__/
 *$py.class
 **/results/
 **/outputs/
+!outputs/
+!outputs/smoke_results/
+!outputs/smoke_results/*.png
+!outputs/smoke_results/summary.csv
 **/burgers_data_gen
 .trae/ 
 .vscode/

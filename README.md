@@ -10,8 +10,8 @@ diffusion-wave fractional PINNs. The paper focuses on Caputo orders
 representations, validates the quadrature behavior at derivative level, and
 implements the current benchmark cases in JAX.
 
-The documented training path is JAX. Historical non-JAX files may still exist
-for comparison, but they are not part of the required environment.
+The maintained training implementation is JAX. Numerical reference solvers use
+NumPy/SciPy and are kept only for data generation and validation.
 
 ## Install
 
@@ -168,12 +168,18 @@ The L-shaped case uses
 Omega_L = [-1, 1]^2 \ [0, 1]^2
 
 {}^C D_t^1.8 u - 0.25 Delta u = 0,
-    (t, x, y) in (0, 5] x Omega_L
+    (t, x, y) in (0, 1] x Omega_L
 
 u = 0 on partial Omega_L
 u(0, x, y) = g(x, y)
 u_t(0, x, y) = 0.2 g(x, y)
 ```
+
+The training configuration and default reference archive use `T = 1`. The
+README preview below is generated with `T = 5` only to make the time evolution
+easier to inspect.
+
+![L-shaped reference, T=5](data/lshape/lshape_reference_T5.gif)
 
 ## Reference Solutions
 
@@ -184,6 +190,7 @@ python reference_solvers/forward_1d/generate_forward_reference_gif.py
 python reference_solvers/burgers_1d/generate_burgers_reference_gifs.py
 python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py
 python reference_solvers/lshape_2d/generate_lshape_reference.py
+python reference_solvers/lshape_2d/generate_lshape_reference.py --t-final 5.0 --output-prefix lshape_reference_T5 --gif-only
 ```
 
 Outputs are written to:
@@ -193,7 +200,7 @@ Outputs are written to:
 | `forward_1d/generate_forward_reference_gif.py` | `data/reference_1d/forward_alpha1p75_reference.gif` |
 | `burgers_1d/generate_burgers_reference_gifs.py` | `data/reference_1d/burgers_alpha*_reference.gif` and `burgers_reference_summary.csv` |
 | `irregular_hole_2d/generate_irregular_hole_reference.py` | `data/irregular_hole/irregular_hole_reference.npz`, `irregular_hole_reference.gif`, `irregular_hole_exact.gif` |
-| `lshape_2d/generate_lshape_reference.py` | `data/lshape/lshape_reference.npz`, `lshape_reference.gif` |
+| `lshape_2d/generate_lshape_reference.py` | `data/lshape/lshape_reference.npz`, `lshape_reference.gif`; README preview `lshape_reference_T5.gif` |
 
 Detailed options are in [`reference_solvers/README.md`](reference_solvers/README.md).
 

@@ -2,7 +2,7 @@ name: lshape
 
 # L-shaped reference-comparison benchmark from reference_solvers/lshape_2d.
 al: 1.8
-tlim: [0, 5]
+tlim: [0, 1]
 method: GJ-II
 
 diffusion_scale: 0.25
