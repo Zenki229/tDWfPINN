@@ -18,6 +18,10 @@ if str(ROOT) not in sys.path:
 from lshape_case_package.code.lshape_fd_reference_and_gif import build_lshape_fd
 
 
+def float_token(value):
+    return f"{value:.2f}".replace("-", "m").replace(".", "p")
+
+
 def initial_profile(x, y):
     return (
         np.exp(-((x + 0.55) ** 2 + (y + 0.45) ** 2) / 0.08)
@@ -118,6 +122,7 @@ def generate_reference(
     n_steps,
     t_final,
     outdir,
+    output_prefix,
 ):
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -151,8 +156,11 @@ def generate_reference(
         snapshots.append(vector_to_grid(u_vec, x_grid, visible_domain, pts))
     snapshots = np.asarray(snapshots)
 
+    npz_path = outdir / f"{output_prefix}.npz"
+    gif_path = outdir / f"{output_prefix}.gif"
+
     np.savez_compressed(
-        outdir / "lshape_reference.npz",
+        npz_path,
         alpha=alpha,
         diffusion_scale=diffusion_scale,
         n_grid=n_grid,
@@ -188,15 +196,15 @@ def generate_reference(
         for t_value, u_grid in zip(times, snapshots)
     ]
     frames[0].save(
-        outdir / "lshape_reference.gif",
+        gif_path,
         save_all=True,
         append_images=frames[1:],
         duration=140,
         loop=0,
     )
 
-    print(f"saved: {outdir / 'lshape_reference.npz'}")
-    print(f"saved: {outdir / 'lshape_reference.gif'}")
+    print(f"saved: {npz_path}")
+    print(f"saved: {gif_path}")
     print(
         "time method: backward Euler convolution quadrature, "
         f"n_steps={n_steps}, dt={solver_times[1] - solver_times[0]:.6g}, "
@@ -215,7 +223,16 @@ def main():
     parser.add_argument("--n-steps", type=int, default=2000)
     parser.add_argument("--t-final", type=float, default=5.0)
     parser.add_argument("--outdir", type=Path, default=Path("data/lshape"))
+    parser.add_argument("--output-prefix", default="lshape_reference")
+    parser.add_argument(
+        "--tag-alpha",
+        action="store_true",
+        help="append an alpha token to the output prefix, e.g. alpha1p25",
+    )
     args = parser.parse_args()
+    output_prefix = args.output_prefix
+    if args.tag_alpha:
+        output_prefix = f"{output_prefix}_alpha{float_token(args.alpha)}"
     generate_reference(
         args.alpha,
         args.diffusion_scale,
@@ -225,6 +242,7 @@ def main():
         args.n_steps,
         args.t_final,
         args.outdir,
+        output_prefix,
     )
 
 

@@ -64,5 +64,24 @@ data/lshape/lshape_reference.npz
 data/lshape/lshape_reference.gif
 ```
 
+To keep several fractional orders side by side, append an alpha token:
+
+```bash
+python reference_solvers/lshape_2d/generate_lshape_reference.py --alpha 1.25 --tag-alpha
+python reference_solvers/lshape_2d/generate_lshape_reference.py --alpha 1.50 --tag-alpha
+python reference_solvers/lshape_2d/generate_lshape_reference.py --alpha 1.75 --tag-alpha
+```
+
+These commands write:
+
+```text
+data/lshape/lshape_reference_alpha1p25.npz
+data/lshape/lshape_reference_alpha1p25.gif
+data/lshape/lshape_reference_alpha1p50.npz
+data/lshape/lshape_reference_alpha1p50.gif
+data/lshape/lshape_reference_alpha1p75.npz
+data/lshape/lshape_reference_alpha1p75.gif
+```
+
 The nested [`lshape_case_package/`](lshape_case_package/README.md) directory is
 the original package used for the L-shaped mesh and preview figures.
