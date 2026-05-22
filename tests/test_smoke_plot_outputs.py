@@ -8,9 +8,12 @@ import numpy as np
 from scripts.generate_smoke_results import (
     PAPER_COLORMAP,
     PAPER_SHADING,
+    float_token,
     lshape_reference_slices,
     plot_1d_case,
     plot_2d_time_slice_files,
+    resolve_burgers_data_path,
+    resolve_lshape_data_path,
 )
 
 
@@ -84,3 +87,19 @@ def test_lshape_default_slices_follow_reference_final_time(tmp_path):
     assert meta["alpha"] == 1.8
     assert meta["t_final"] == 1.0
     assert [time_value for time_value, _ in selected] == [0.5, 1.0]
+
+
+def test_alpha_specific_reference_paths_use_tokens(tmp_path):
+    lshape_dir = tmp_path / "lshape"
+    lshape_dir.mkdir()
+    lshape_ref = lshape_dir / "lshape_reference_alpha1p25.npz"
+    lshape_ref.touch()
+
+    burgers_dir = tmp_path / "burgers"
+    burgers_dir.mkdir()
+    burgers_ref = burgers_dir / "burgers_175.npz"
+    burgers_ref.touch()
+
+    assert float_token(1.5) == "1p50"
+    assert resolve_lshape_data_path(None, 1.25, lshape_dir) == lshape_ref
+    assert resolve_burgers_data_path(None, 1.75, burgers_dir) == burgers_ref

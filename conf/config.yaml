@@ -9,9 +9,15 @@ version: v1
 seed: 42
 
 wandb:
-  project: "jax-pinn"
+  project: "tDWfPINN"
   entity: null
   mode: "online"
+  # Leave name/group/tags null to use the automatic naming scheme:
+  # <case>_alpha<alpha>_<method>_<quad><points>_steps<steps>_seed<seed>.
+  name: null
+  group: null
+  tags: null
+  job_type: "train"
 
 weighting:
   scheme: grad_norm           # "grad_norm" or "ntk" or "none"
@@ -38,4 +44,4 @@ saving:
 
 hydra:
   run:
-    dir: outputs/${pde.name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: outputs/${pde.name}/${pde.method}/alpha${pde.al}/${now:%Y-%m-%d_%H-%M-%S}

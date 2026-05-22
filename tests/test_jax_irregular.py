@@ -103,6 +103,36 @@ def test_lshape_sampler_domain_and_boundary():
     assert np.all(on_boundary)
 
 
+def test_irregular_samplers_expose_rad_candidate_points():
+    hole = IrregularHoleSampler(
+        [0, 1],
+        {"in": 4, "bd": 2, "init": 2},
+        center=(-0.3, 0.2),
+        r0=0.25,
+    )
+    lshape = LShapeSampler([0, 1], {"in": 4, "bd": 2, "init": 2})
+
+    hole_points = hole.sample_interior(8)
+    lshape_points = lshape.sample_interior(8)
+
+    assert hole_points.shape == (8, 3)
+    assert lshape_points.shape == (8, 3)
+    center = np.array([-0.3, 0.2])
+    assert np.all(np.sum((hole_points[:, 1:3] - center) ** 2, axis=1) > 0.25 ** 2)
+    assert np.all((lshape_points[:, 1] < 0.0) | (lshape_points[:, 2] < 0.0))
+
+
+def test_lbfgs_train_state_can_start_for_irregular_model():
+    key = jax.random.PRNGKey(7)
+    optim_cfg = OmegaConf.create({
+        "optimizer": "lbfgs",
+        "lbfgs": {"use": True, "lr": 1e-2, "history_size": 3},
+    })
+    state = create_train_state(key, _model_cfg(), optim_cfg, _weighting_cfg())
+
+    assert state.opt_state is not None
+
+
 def test_irregular_hole_exact_initial_and_boundary_values():
     pde = JAXIrregularHoleDW(_hole_cfg())
     points = np.array([

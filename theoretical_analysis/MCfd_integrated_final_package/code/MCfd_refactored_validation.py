@@ -597,9 +597,9 @@ def experiment_nonsmooth(
     for (label, vals), color in zip(gjI_err.items(), colors):
         ax.loglog(M_gj, np.maximum(vals, ERR_FLOOR), marker="o", ms=3.0, lw=1.2, color=color, label=label)
     ax.set_xlabel(r"Gauss--Jacobi nodes $M$")
-    ax.set_ylabel("relative error, GJ-I")
+    ax.set_ylabel("relative error")
     ax.set_ylim(1e-16, 3e-1)
-    ax.set_title(r"regularity controls convergence")
+    ax.set_title(r"GJ-I regularity controls convergence")
     finish_axis(ax, legend=True)
     panel_label(ax, "b")
 
@@ -607,7 +607,7 @@ def experiment_nonsmooth(
     for m in ["MC-I", "MC-II", "GJ-I", "GJ-II"]:
         ax.semilogy(alphas, np.maximum(err_alpha[m], ERR_FLOOR), color=COLORS[m], lw=1.2, ls=LINESTYLES.get(m, "-"), label=m)
     ax.set_xlabel(r"fractional order $\alpha$")
-    ax.set_ylabel(r"relative error for $(t-t_c)_+^\beta$")
+    ax.set_ylabel("relative error")
     ax.set_ylim(1e-8, 2)
     ax.set_title(r"interior non-smooth point")
     finish_axis(ax, legend=True)

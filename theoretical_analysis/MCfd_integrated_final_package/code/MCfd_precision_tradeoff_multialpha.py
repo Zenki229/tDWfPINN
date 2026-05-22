@@ -12,9 +12,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from scipy.special import gamma, hyp1f1, roots_jacobi
 
-OUT = Path('/mnt/data/MCfd_precision_tradeoff_multialpha_report')
+OUT = Path(__file__).resolve().parents[1] / 'packages_unpacked' / 'precision_tradeoff_multi_alpha' / 'MCfd_precision_tradeoff_multialpha_report'
 OUT.mkdir(parents=True, exist_ok=True)
-SRC_REPORT = Path('/mnt/data/MCfd_precision_tradeoff_report')
+SRC_REPORT = Path(__file__).resolve().parents[1] / 'packages_unpacked' / 'precision_tradeoff_single_alpha' / 'MCfd_precision_tradeoff_report'
 MM_TO_IN = 1 / 25.4
 
 COLORS = {
@@ -492,9 +492,9 @@ $$
 
 
 def package() -> Path:
-    zip_path = Path('/mnt/data/MCfd_precision_tradeoff_multialpha_report_package.zip')
+    zip_path = OUT.parent / 'MCfd_precision_tradeoff_multialpha_report_package.zip'
     with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as z:
-        z.write('/mnt/data/MCfd_precision_tradeoff_multialpha.py', 'MCfd_precision_tradeoff_multialpha.py')
+        z.write(__file__, 'MCfd_precision_tradeoff_multialpha.py')
         for p in OUT.iterdir():
             if p.is_file():
                 z.write(p, f'MCfd_precision_tradeoff_multialpha_report/{p.name}')

@@ -8,13 +8,15 @@ sys.path.append(str(ROOT))
 
 from scripts.run_stress_tests import (
     make_preview_sheet,
+    parse_alpha_list,
+    float_token,
     plot_timing,
     write_summary,
     write_timing_pivot,
 )
 
 
-FLOAT_KEYS = {"elapsed_seconds", "average_step_seconds", "loss", "relative_error"}
+FLOAT_KEYS = {"alpha", "elapsed_seconds", "average_step_seconds", "loss", "relative_error"}
 INT_KEYS = {
     "steps",
     "quad_points",
@@ -31,6 +33,7 @@ def read_rows(summary_files):
     for path in summary_files:
         with Path(path).open(newline="") as f:
             for row in csv.DictReader(f):
+                row.setdefault("alpha", "nan")
                 for key in FLOAT_KEYS:
                     row[key] = float(row[key])
                 for key in INT_KEYS:
@@ -48,18 +51,25 @@ def main():
         default="forward,burgers,irregular_hole,lshape",
     )
     parser.add_argument("--methods", default="GJ-I,GJ-II,MC-I,MC-II")
+    parser.add_argument("--alphas", default="1.25,1.5,1.75")
     args = parser.parse_args()
 
     cases = [item.strip() for item in args.cases.split(",") if item.strip()]
     methods = [item.strip() for item in args.methods.split(",") if item.strip()]
+    alphas = parse_alpha_list(args.alphas)
     rows = read_rows(args.summary)
-    rows.sort(key=lambda row: (cases.index(row["case"]), methods.index(row["method"])))
+    alpha_order = {float_token(alpha): idx for idx, alpha in enumerate(alphas)}
+    rows.sort(key=lambda row: (
+        cases.index(row["case"]),
+        alpha_order.get(float_token(row["alpha"]), len(alpha_order)),
+        methods.index(row["method"]),
+    ))
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     summary = write_summary(rows, args.outdir)
-    pivot = write_timing_pivot(rows, args.outdir, cases, methods)
-    timing_plot = plot_timing(rows, args.outdir, cases, methods)
-    preview = make_preview_sheet(rows, args.outdir, cases, methods)
+    pivot = write_timing_pivot(rows, args.outdir, cases, methods, alphas)
+    timing_plot = plot_timing(rows, args.outdir, cases, methods, alphas)
+    preview = make_preview_sheet(rows, args.outdir, cases, methods, alphas)
 
     print(f"summary={summary}")
     print(f"timing_pivot={pivot}")

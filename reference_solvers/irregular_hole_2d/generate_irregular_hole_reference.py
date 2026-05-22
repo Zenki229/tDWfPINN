@@ -24,6 +24,10 @@ class HoleConfig:
     t_final: float = 1.0
 
 
+def float_token(value):
+    return f"{float(value):.2f}".replace(".", "p")
+
+
 def frac_bdf_coeff(n_coeffs, alpha):
     weights = np.zeros(n_coeffs, dtype=float)
     weights[0] = 1.0
@@ -324,7 +328,7 @@ def solve_reference(args):
     }
 
 
-def save_outputs(result, outdir, duration):
+def save_outputs(result, outdir, duration, output_prefix="irregular_hole_reference"):
     outdir.mkdir(parents=True, exist_ok=True)
     cfg = result["config"]
     snapshots = result["snapshots"]
@@ -337,9 +341,16 @@ def save_outputs(result, outdir, duration):
     )
     vmin = float(np.min(finite_vals))
     vmax = float(np.max(finite_vals))
+    npz_path = outdir / f"{output_prefix}.npz"
+    reference_gif_path = outdir / f"{output_prefix}.gif"
+    exact_gif_path = (
+        outdir / "irregular_hole_exact.gif"
+        if output_prefix == "irregular_hole_reference"
+        else outdir / f"{output_prefix}_exact.gif"
+    )
 
     np.savez_compressed(
-        outdir / "irregular_hole_reference.npz",
+        npz_path,
         alpha=cfg.alpha,
         center=np.asarray(cfg.center),
         radius=cfg.radius,
@@ -394,7 +405,7 @@ def save_outputs(result, outdir, duration):
         )
     ]
     reference_frames[0].save(
-        outdir / "irregular_hole_reference.gif",
+        reference_gif_path,
         save_all=True,
         append_images=reference_frames[1:],
         duration=duration,
@@ -416,16 +427,16 @@ def save_outputs(result, outdir, duration):
         for exact_snapshot, t_value in zip(result["exact_snapshots"], result["times"])
     ]
     exact_frames[0].save(
-        outdir / "irregular_hole_exact.gif",
+        exact_gif_path,
         save_all=True,
         append_images=exact_frames[1:],
         duration=duration,
         loop=0,
     )
 
-    print(f"saved: {outdir / 'irregular_hole_reference.npz'}")
-    print(f"saved: {outdir / 'irregular_hole_reference.gif'}")
-    print(f"saved: {outdir / 'irregular_hole_exact.gif'}")
+    print(f"saved: {npz_path}")
+    print(f"saved: {reference_gif_path}")
+    print(f"saved: {exact_gif_path}")
     print(
         "grid: "
         f"{len(result['x'])} x {len(result['y'])}, "
@@ -444,6 +455,12 @@ def main():
     parser.add_argument("--n-frames", type=int, default=81)
     parser.add_argument("--duration", type=int, default=130)
     parser.add_argument("--alpha", type=float, default=1.5)
+    parser.add_argument("--output-prefix", default="irregular_hole_reference")
+    parser.add_argument(
+        "--tag-alpha",
+        action="store_true",
+        help="append an alpha token to the output prefix, e.g. alpha1p25",
+    )
     parser.add_argument("--t-final", type=float, default=1.0)
     parser.add_argument("--center-x", type=float, default=-0.3)
     parser.add_argument("--center-y", type=float, default=0.2)
@@ -453,7 +470,10 @@ def main():
     args = parser.parse_args()
 
     result = solve_reference(args)
-    save_outputs(result, args.outdir, args.duration)
+    output_prefix = args.output_prefix
+    if args.tag_alpha:
+        output_prefix = f"{output_prefix}_alpha{float_token(args.alpha)}"
+    save_outputs(result, args.outdir, args.duration, output_prefix)
 
 
 if __name__ == "__main__":

@@ -44,6 +44,8 @@ From the repository root:
 python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py
 ```
 
+Use `--alpha` to generate another fractional order.
+
 Default numerical settings:
 
 ```text
@@ -65,4 +67,12 @@ Outputs:
 data/irregular_hole/irregular_hole_reference.npz
 data/irregular_hole/irregular_hole_reference.gif
 data/irregular_hole/irregular_hole_exact.gif
+```
+
+To keep the paper orders side by side without overwriting files:
+
+```bash
+python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py --alpha 1.25 --tag-alpha
+python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py --alpha 1.50 --tag-alpha
+python reference_solvers/irregular_hole_2d/generate_irregular_hole_reference.py --alpha 1.75 --tag-alpha
 ```

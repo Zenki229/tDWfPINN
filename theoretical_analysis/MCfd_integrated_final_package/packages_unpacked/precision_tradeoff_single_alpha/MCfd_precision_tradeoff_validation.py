@@ -517,7 +517,7 @@ def experiment_precision(outdir: Path, alpha: float = 1.5, t: float = 1.5, lam: 
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel(r"$	au_j$ at $M=1024$")
-        ax.set_ylabel("pointwise relative error")
+        ax.set_ylabel("relative error")
         ax.set_title(f"raw quotient {kernel_name} pointwise error")
         panel(ax, "cd"[j])
         finish(ax, legend=(j == 1))

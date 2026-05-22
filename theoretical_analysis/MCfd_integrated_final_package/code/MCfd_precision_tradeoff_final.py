@@ -14,7 +14,7 @@ try:
 except Exception:
     ml_dtypes = None
 
-OUT = Path('/mnt/data/MCfd_precision_tradeoff_report')
+OUT = Path(__file__).resolve().parents[1] / 'packages_unpacked' / 'precision_tradeoff_single_alpha' / 'MCfd_precision_tradeoff_report'
 OUT.mkdir(parents=True, exist_ok=True)
 MM_TO_IN = 1/25.4
 ERR_FLOOR = 1e-18
@@ -161,17 +161,17 @@ def precision_experiment(t=1.5,alpha=1.5):
     fig,axes=plt.subplots(1,3,figsize=(183*MM_TO_IN,62*MM_TO_IN),constrained_layout=True)
     ax=axes[0]
     for s in ss: ax.loglog(tau[order],Hrel[s.name][order],color=s.color,ls=s.ls,lw=1.15,label=s.name)
-    ax.set_xlabel(r'GJ node $\tau_j$'); ax.set_ylabel(r'relative error in raw $H_f$'); ax.set_ylim(1e-16,2e6); ax.set_title(r'Type-II quotient, $M=512$'); finish(ax,True); panel(ax,'a')
+    ax.set_xlabel(r'GJ node $\tau_j$'); ax.set_ylabel('relative error'); ax.set_ylim(1e-16,2e6); ax.set_title(r'Type-II quotient, $M=512$'); finish(ax,True); panel(ax,'a')
     ax=axes[1]
     for s in ss: ax.loglog(tau[order],Krel[s.name][order],color=s.color,ls=s.ls,lw=1.15,label=s.name)
-    ax.set_xlabel(r'GJ node $\tau_j$'); ax.set_ylabel(r'relative error in raw $K_f$'); ax.set_ylim(1e-16,2e6); ax.set_title(r'Type-I quotient, $M=512$'); finish(ax,False); panel(ax,'b')
+    ax.set_xlabel(r'GJ node $\tau_j$'); ax.set_ylabel('relative error'); ax.set_ylim(1e-16,2e6); ax.set_title(r'Type-I quotient, $M=512$'); finish(ax,False); panel(ax,'b')
     ax=axes[2]
     for s in ss:
         sub=dfM[(dfM.method=='GJ-II')&(dfM.precision==s.name)]
         ax.loglog(sub.M,sub.rel_error,color=s.color,ls=s.ls,marker='o',ms=2.5,lw=1.05,label=s.name)
     ax2=ax.twinx(); ax2.loglog(Ms,tau_min,color='0.65',lw=0.9,ls=(0,(2,2)),label=r'$\tau_{\min}$')
     ax2.set_ylabel(r'$\tau_{\min}$',color='0.4'); ax2.tick_params(axis='y',labelcolor='0.4')
-    ax.set_xlabel(r'GJ nodes $M$'); ax.set_ylabel('relative error of GJ-II'); ax.set_ylim(1e-16,2e6); ax.set_title('GJ-II raw quotient under precision changes')
+    ax.set_xlabel(r'GJ nodes $M$'); ax.set_ylabel('relative error'); ax.set_ylim(1e-16,2e6); ax.set_title('GJ-II raw quotient under precision changes')
     finish(ax,False); h1,l1=ax.get_legend_handles_labels(); h2,l2=ax2.get_legend_handles_labels(); ax.legend(h1+h2,l1+l2,frameon=False,fontsize=7.0,loc='best',handlelength=2.0); panel(ax,'c')
     savefig(fig,'fig04_precision_raw_quotients')
     fig,axes=plt.subplots(1,2,figsize=(126*MM_TO_IN,58*MM_TO_IN),constrained_layout=True)
@@ -179,7 +179,7 @@ def precision_experiment(t=1.5,alpha=1.5):
         for s in ss:
             sub=dfM[(dfM.method==method)&(dfM.precision==s.name)]
             ax.loglog(sub.M,sub.rel_error,color=s.color,ls=s.ls,marker='o',ms=2.5,lw=1.05,label=s.name)
-        ax.set_xlabel(r'GJ nodes $M$'); ax.set_ylabel(f'relative error of {method}'); ax.set_ylim(1e-16,2e6); ax.set_title(f'{method}: raw quotient precision'); finish(ax,legend=(method=='GJ-I')); panel(ax,lab)
+        ax.set_xlabel(r'GJ nodes $M$'); ax.set_ylabel('relative error'); ax.set_ylim(1e-16,2e6); ax.set_title(f'{method}: raw quotient precision'); finish(ax,legend=(method=='GJ-I')); panel(ax,lab)
     savefig(fig,'fig05_precision_GJ_M_sweep')
     return {'M':Ms.tolist(),'tau_min':list(map(float,tau_min)),'precisions':[s.name for s in ss]}
 
@@ -428,9 +428,9 @@ res={'precision':precision_experiment(),'tradeoff':tradeoff_experiment()}
 (OUT/'precision_tradeoff_results.json').write_text(json.dumps(res,indent=2),encoding='utf-8')
 write_report(res)
 # package
-zip_path=Path('/mnt/data/MCfd_precision_tradeoff_report_package.zip')
+zip_path=OUT.parent / 'MCfd_precision_tradeoff_report_package.zip'
 with zipfile.ZipFile(zip_path,'w',compression=zipfile.ZIP_DEFLATED) as z:
-    z.write('/mnt/data/MCfd_precision_tradeoff_final.py','MCfd_precision_tradeoff_final.py')
+    z.write(__file__,'MCfd_precision_tradeoff_final.py')
     for p in OUT.iterdir():
         if p.is_file(): z.write(p,f'MCfd_precision_tradeoff_report/{p.name}')
 print('done', OUT, zip_path)

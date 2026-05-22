@@ -387,7 +387,7 @@ def experiment_alpha_sweep(
     for m in ["MC-I", "MC-II", "GJ-I", "GJ-II"]:
         ax.semilogy(alphas, err[m], color=COLORS[m], lw=1.3, ls=LINESTYLES[m], label=m)
     ax.set_xlabel(r"Fractional order $\alpha$")
-    ax.set_ylabel("Relative error")
+    ax.set_ylabel("relative error")
     ax.set_xlim(alphas.min(), alphas.max())
     ax.set_ylim(1e-16, 2)
     panel_label(ax, "b")
@@ -466,7 +466,7 @@ def experiment_M_sweep(
     for method in ["GJ-I", "GJ-II"]:
         ax.loglog(M_gj, gj_err[f"{method}-raw"], color=COLORS[method], marker=MARKERS[method], ms=3.2, lw=1.3, label=method)
     ax.set_xlabel(r"Quadrature points $M$")
-    ax.set_ylabel("Relative error")
+    ax.set_ylabel("relative error")
     ax.set_ylim(1e-16, 2e-1)
     ax.legend(loc="lower left", ncol=1)
     panel_label(ax, "a")
@@ -485,7 +485,7 @@ def experiment_M_sweep(
             label=f"{method}, stable",
         )
     ax.set_xlabel(r"Gauss--Jacobi points $M$")
-    ax.set_ylabel("Relative error")
+    ax.set_ylabel("relative error")
     ax.set_ylim(1e-16, 1e-4)
     ax.legend(loc="upper left", ncol=1)
     panel_label(ax, "b")
@@ -574,7 +574,8 @@ def experiment_nonsmooth(
     for label, color in zip(labels_order, colors_order):
         ax.loglog(M_gj, err_gj_I[label], marker="o", ms=3, lw=1.25, color=color, label=label)
     ax.set_xlabel(r"Gauss--Jacobi points $M$")
-    ax.set_ylabel(r"Relative error, GJ-I")
+    ax.set_ylabel("relative error")
+    ax.set_title("GJ-I regularity test")
     ax.set_ylim(1e-16, 3e-1)
     ax.legend(loc="lower left")
     panel_label(ax, "b")
@@ -583,7 +584,8 @@ def experiment_nonsmooth(
     for m in ["MC-I", "MC-II", "GJ-I", "GJ-II"]:
         ax.semilogy(alphas, err_alpha[m], color=COLORS[m], lw=1.25, ls=LINESTYLES.get(m, "-"), label=m)
     ax.set_xlabel(r"Fractional order $\alpha$")
-    ax.set_ylabel(r"Rel. error for $(t-t_c)_+^\beta$")
+    ax.set_ylabel("relative error")
+    ax.set_title(r"interior kink $(t-t_c)_+^\beta$")
     ax.set_ylim(1e-8, 2)
     ax.legend(loc="upper left")
     panel_label(ax, "c")

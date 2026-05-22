@@ -1,0 +1,7 @@
+alpha,type,small_quantity,small_fit_range,small_fitted_slope,small_expected_slope,large_quantity,large_fit_range,large_fitted_slope,large_expected_slope
+1.25,I,raw32-stable gap,"(1e-06, 0.0003)",-0.3183011503776806,-0.25,stable cutoff bias,"(0.003, 0.1)",0.7550407160908377,0.75
+1.25,II,raw32-stable gap,"(1e-06, 0.0003)",-1.348122919671248,-1.25,stable cutoff bias,"(0.003, 0.1)",0.7538651855635891,0.75
+1.5,I,raw32-stable gap,"(1e-06, 0.0003)",-0.5142515826433993,-0.5,stable cutoff bias,"(0.003, 0.1)",0.5037008693312967,0.5
+1.5,II,raw32-stable gap,"(1e-06, 0.0003)",-1.4973452687688558,-1.5,stable cutoff bias,"(0.003, 0.1)",0.5029325553108801,0.5
+1.75,I,raw32-stable gap,"(1e-06, 0.0003)",-0.6160663870212026,-0.75,stable cutoff bias,"(0.003, 0.1)",0.2520581447378748,0.25
+1.75,II,raw32-stable gap,"(1e-06, 0.0003)",-1.7922336866871262,-1.75,stable cutoff bias,"(0.003, 0.1)",0.25170706362775913,0.25

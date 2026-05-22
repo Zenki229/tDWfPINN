@@ -3,6 +3,7 @@ import os
 import hydra
 import jax
 import jax.numpy as jnp
+import numpy as np
 import wandb
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
@@ -10,6 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 from libs.jax_evaluator import BaseEvaluator
 from libs.jax_pde_irregular import JAXIrregularHoleDW, JAXLShapeDW
 from libs.jax_pinn import create_train_state
+from libs.jax_run_metadata import prepare_wandb_run, wandb_init_kwargs
 from libs.jax_sample import IrregularHoleSampler, LShapeSampler
 from libs.jax_utils import (
     EpochTimer,
@@ -18,6 +20,15 @@ from libs.jax_utils import (
     save_checkpoint,
     unreplicate,
 )
+
+
+def _cfg_get(config, name, default=None):
+    if config is None:
+        return default
+    try:
+        return getattr(config, name)
+    except (AttributeError, KeyError):
+        return default
 
 
 def _build_case(cfg, n_devices):
@@ -51,20 +62,73 @@ def _build_case(cfg, n_devices):
     return pde, sampler, label
 
 
+def _rad_enabled(cfg):
+    return bool(_cfg_get(_cfg_get(cfg.pde, "RAD"), "use", False))
+
+
+def _rad_resample_batch(cfg, pde, sampler, state, batch_host, step):
+    rad_cfg = cfg.pde.RAD
+    ratio = float(_cfg_get(rad_cfg, "ratio", 0.3))
+    ratio = min(max(ratio, 0.0), 1.0)
+    batch_in = int(batch_host["in"].shape[0])
+    num_rad = min(batch_in, max(1, int(round(batch_in * ratio))))
+    candidate_cfg = _cfg_get(rad_cfg, "batch")
+    candidate_in = int(_cfg_get(candidate_cfg, "in", max(batch_in, num_rad)))
+    candidate_in = max(candidate_in, num_rad)
+
+    candidates = sampler.sample_interior(candidate_in)
+    eval_state = unreplicate(state)
+    key = jax.random.PRNGKey(int(cfg.seed) + int(step) + 7919)
+    residual = pde.r_net(
+        eval_state.apply_fn,
+        eval_state.params,
+        jnp.asarray(candidates),
+        key,
+    )
+    residual = np.asarray(jax.device_get(residual)).reshape(-1)
+    err = np.square(residual)
+    err_sum = float(np.sum(err))
+    if not np.isfinite(err_sum) or err_sum <= 1e-12:
+        prob = None
+    else:
+        prob = err / err_sum
+
+    replace = num_rad <= len(candidates)
+    indices = np.random.default_rng(int(cfg.seed) + int(step)).choice(
+        len(candidates),
+        size=num_rad,
+        replace=not replace,
+        p=prob,
+    )
+    selected = candidates[indices]
+    keep_count = batch_in - num_rad
+    if keep_count > 0:
+        kept = batch_host["in"][:keep_count]
+        batch_host["in"] = np.concatenate([kept, selected], axis=0)
+    else:
+        batch_host["in"] = selected
+    return batch_host
+
+
+def _next_training_batch(cfg, pde, sampler, state, step):
+    batch_host = sampler.sample()
+    if _rad_enabled(cfg):
+        batch_host = _rad_resample_batch(cfg, pde, sampler, state, batch_host, step)
+    return sampler._shard(batch_host)
+
+
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     cfg.model.input_dim = 3
+    prepare_wandb_run(cfg)
 
     if cfg.wandb.mode != "disabled":
-        wandb.init(
-            project=cfg.wandb.project,
-            entity=cfg.wandb.entity,
-            mode=cfg.wandb.mode,
-            config=OmegaConf.to_container(cfg, resolve=True),
-        )
+        wandb.init(**wandb_init_kwargs(cfg))
 
     n_devices = jax.local_device_count()
     print(f"[*] Running on {n_devices} device(s): {jax.devices()}")
+    print(f"[*] Run name: {cfg.wandb.name}")
+    print(f"[*] W&B group: {cfg.wandb.group}")
 
     root_key = jax.random.PRNGKey(cfg.seed)
     root_key, model_key = jax.random.split(root_key)
@@ -79,6 +143,8 @@ def main(cfg: DictConfig):
     evaluator = BaseEvaluator(cfg, pde)
     print(f"[*] PDE: {label}")
     print(f"[*] Method: {cfg.pde.method}, alpha = {cfg.pde.al}")
+    print(f"[*] Optimizer: {cfg.training.optimizer}")
+    print(f"[*] RAD: {'enabled' if _rad_enabled(cfg) else 'disabled'}")
 
     state = replicate(state)
     pmap_keys = jax.random.split(root_key, n_devices)
@@ -109,7 +175,7 @@ def main(cfg: DictConfig):
 
     timer.start()
     for step in range(max_steps):
-        batch_sharded = next(sampler)
+        batch_sharded = _next_training_batch(cfg, pde, sampler, state, step)
         state, loss_val, aux, pmap_keys = pde.step(state, batch_sharded, pmap_keys)
         timing_log = timer.maybe_record(step + 1, loss_val)
         if timing_log and cfg.wandb.mode != "disabled":

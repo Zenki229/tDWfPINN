@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
 from scripts.generate_smoke_results import (  # noqa: E402
+    float_token,
     make_burgers,
     make_forward,
     make_irregular_hole,
@@ -45,22 +46,29 @@ def file_token(value):
     return value.lower().replace("-", "_")
 
 
+def parse_alpha_list(value):
+    return [float(item.strip()) for item in value.split(",") if item.strip()]
+
+
 def default_outdir():
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return Path("outputs") / "stress_results" / stamp
 
 
-def run_one(case, method, args):
+def run_one(case, method, alpha, args):
     quad_family, type_token = method_parts(method)
     quad = args.gj_quad if quad_family == "GJ" else args.mc_quad
     batch_in = args.batch_in_2d if case in {"irregular_hole", "lshape"} else args.batch_in_1d
 
     smoke_args = SimpleNamespace(
         case=case,
+        alpha=alpha,
         steps=args.steps,
         quad=quad,
         method=method,
-        output_prefix=f"{file_token(case)}_{file_token(method)}",
+        output_prefix=(
+            f"{file_token(case)}_{file_token(method)}_alpha{float_token(alpha)}"
+        ),
         batch_in=batch_in,
         batch_bd=args.batch_bd,
         batch_init=args.batch_init,
@@ -79,6 +87,7 @@ def run_one(case, method, args):
     row.update({
         "quadrature": quad_family,
         "type": type_token,
+        "alpha": alpha,
         "steps": args.steps,
         "quad_points": quad,
         "batch_in": batch_in,
@@ -91,10 +100,33 @@ def run_one(case, method, args):
     return row
 
 
+def ordered_alpha_values(rows, alphas=None):
+    if alphas is not None:
+        return [float(alpha) for alpha in alphas]
+    seen = []
+    for row in rows:
+        alpha = float(row["alpha"])
+        if not any(np.isclose(alpha, existing) for existing in seen):
+            seen.append(alpha)
+    return seen
+
+
+def group_keys(rows, cases, alphas=None):
+    alpha_values = ordered_alpha_values(rows, alphas)
+    present = {(row["case"], float_token(row["alpha"])) for row in rows}
+    groups = []
+    for case in cases:
+        for alpha in alpha_values:
+            if (case, float_token(alpha)) in present:
+                groups.append((case, alpha))
+    return groups
+
+
 def write_summary(rows, outdir):
     path = outdir / "summary.csv"
     fieldnames = [
         "case",
+        "alpha",
         "method",
         "quadrature",
         "type",
@@ -118,7 +150,13 @@ def write_summary(rows, outdir):
             writer.writerow({
                 key: (
                     f"{row[key]:.8e}"
-                    if key in {"elapsed_seconds", "average_step_seconds", "loss", "relative_error"}
+                    if key in {
+                        "alpha",
+                        "elapsed_seconds",
+                        "average_step_seconds",
+                        "loss",
+                        "relative_error",
+                    }
                     else row[key]
                 )
                 for key in fieldnames
@@ -126,18 +164,24 @@ def write_summary(rows, outdir):
     return path
 
 
-def write_timing_pivot(rows, outdir, cases, methods):
+def write_timing_pivot(rows, outdir, cases, methods, alphas=None):
     path = outdir / "timing_seconds_pivot.csv"
-    by_key = {(row["case"], row["method"]): float(row["elapsed_seconds"]) for row in rows}
+    by_key = {
+        (row["case"], float_token(row["alpha"]), row["method"]): float(row["elapsed_seconds"])
+        for row in rows
+    }
+    groups = group_keys(rows, cases, alphas)
     with path.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["case", *methods])
-        for case in cases:
+        writer.writerow(["case", "alpha", *methods])
+        for case, alpha in groups:
+            alpha_key = float_token(alpha)
             writer.writerow([
                 case,
+                f"{alpha:.2f}",
                 *[
-                    f"{by_key[(case, method)]:.8f}"
-                    if (case, method) in by_key
+                    f"{by_key[(case, alpha_key, method)]:.8f}"
+                    if (case, alpha_key, method) in by_key
                     else ""
                     for method in methods
                 ],
@@ -145,20 +189,31 @@ def write_timing_pivot(rows, outdir, cases, methods):
     return path
 
 
-def plot_timing(rows, outdir, cases, methods):
-    by_key = {(row["case"], row["method"]): float(row["elapsed_seconds"]) for row in rows}
-    x = np.arange(len(cases))
+def plot_timing(rows, outdir, cases, methods, alphas=None):
+    by_key = {
+        (row["case"], float_token(row["alpha"]), row["method"]): float(row["elapsed_seconds"])
+        for row in rows
+    }
+    groups = group_keys(rows, cases, alphas)
+    x = np.arange(len(groups))
     width = 0.18
-    offsets = np.linspace(-1.5 * width, 1.5 * width, len(methods))
+    offsets = (np.arange(len(methods)) - (len(methods) - 1) / 2) * width
 
     fig, ax = plt.subplots(figsize=(10.5, 5.0), layout="constrained")
     for offset, method in zip(offsets, methods):
-        values = [by_key.get((case, method), np.nan) for case in cases]
+        values = [
+            by_key.get((case, float_token(alpha), method), np.nan)
+            for case, alpha in groups
+        ]
         ax.bar(x + offset, values, width, label=method)
     ax.set_xticks(x)
-    ax.set_xticklabels(cases, rotation=15, ha="right")
+    ax.set_xticklabels(
+        [f"{case}\nalpha={alpha:.2f}" for case, alpha in groups],
+        rotation=15,
+        ha="right",
+    )
     ax.set_ylabel("seconds / 5000 steps")
-    ax.set_title("Stress-test wall time by PDE and quadrature method")
+    ax.set_title("Stress-test wall time by PDE, alpha, and quadrature method")
     ax.legend(ncols=4)
     ax.grid(axis="y", alpha=0.25)
     path = outdir / "timing_seconds.png"
@@ -176,20 +231,25 @@ def choose_abs_error_path(row):
     return final_time[-1] if final_time else abs_paths[-1]
 
 
-def make_preview_sheet(rows, outdir, cases, methods):
-    lookup = {(row["case"], row["method"]): row for row in rows}
+def make_preview_sheet(rows, outdir, cases, methods, alphas=None):
+    lookup = {
+        (row["case"], float_token(row["alpha"]), row["method"]): row
+        for row in rows
+    }
+    groups = group_keys(rows, cases, alphas)
     thumb_w, thumb_h = 260, 195
     label_h = 44
     margin = 16
     sheet_w = margin + len(methods) * (thumb_w + margin)
-    sheet_h = margin + len(cases) * (thumb_h + label_h + margin)
+    sheet_h = margin + len(groups) * (thumb_h + label_h + margin)
     sheet = Image.new("RGB", (sheet_w, sheet_h), "white")
     draw = ImageDraw.Draw(sheet)
     font = ImageFont.load_default()
 
-    for row_idx, case in enumerate(cases):
+    for row_idx, (case, alpha) in enumerate(groups):
+        alpha_key = float_token(alpha)
         for col_idx, method in enumerate(methods):
-            row = lookup.get((case, method))
+            row = lookup.get((case, alpha_key, method))
             if row is None:
                 continue
             path = choose_abs_error_path(row)
@@ -197,7 +257,12 @@ def make_preview_sheet(rows, outdir, cases, methods):
             img.thumbnail((thumb_w, thumb_h))
             x0 = margin + col_idx * (thumb_w + margin)
             y0 = margin + row_idx * (thumb_h + label_h + margin)
-            draw.text((x0, y0), f"{case} / {method}", fill="black", font=font)
+            draw.text(
+                (x0, y0),
+                f"{case} / alpha={alpha:.2f} / {method}",
+                fill="black",
+                font=font,
+            )
             draw.text(
                 (x0, y0 + 14),
                 f"{float(row['elapsed_seconds']):.1f}s, rel {float(row['relative_error']):.2e}",
@@ -237,11 +302,17 @@ def main():
     parser.add_argument("--time-slices", default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--outdir", type=Path, default=None)
-    parser.add_argument("--burgers-data", type=Path, default=Path("data/burgers_150.npz"))
+    parser.add_argument("--alpha", type=float, default=None)
+    parser.add_argument(
+        "--alphas",
+        default="1.25,1.5,1.75",
+        help="comma-separated fractional orders; ignored when --alpha is set",
+    )
+    parser.add_argument("--burgers-data", type=Path, default=None)
     parser.add_argument(
         "--lshape-data",
         type=Path,
-        default=Path("data/lshape/lshape_reference.npz"),
+        default=None,
     )
     args = parser.parse_args()
     args.outdir = args.outdir or default_outdir()
@@ -249,28 +320,33 @@ def main():
 
     cases = parse_csv_list(args.cases)
     methods = parse_csv_list(args.methods)
+    alphas = [args.alpha] if args.alpha is not None else parse_alpha_list(args.alphas)
     rows = []
     for case in cases:
         if case not in MAKERS:
             raise ValueError(f"Unknown case: {case}")
-        for method in methods:
-            if method not in {"GJ-I", "GJ-II", "MC-I", "MC-II"}:
-                raise ValueError(f"Unknown method: {method}")
-            print(f"[*] running case={case}, method={method}, steps={args.steps}")
-            row = run_one(case, method, args)
-            rows.append(row)
-            print(
-                "[*] done "
-                f"case={case}, method={method}, "
-                f"elapsed={float(row['elapsed_seconds']):.3f}s, "
-                f"loss={float(row['loss']):.3e}, "
-                f"rel={float(row['relative_error']):.3e}"
-            )
+        for alpha in alphas:
+            for method in methods:
+                if method not in {"GJ-I", "GJ-II", "MC-I", "MC-II"}:
+                    raise ValueError(f"Unknown method: {method}")
+                print(
+                    f"[*] running case={case}, alpha={alpha:.2f}, "
+                    f"method={method}, steps={args.steps}"
+                )
+                row = run_one(case, method, alpha, args)
+                rows.append(row)
+                print(
+                    "[*] done "
+                    f"case={case}, alpha={alpha:.2f}, method={method}, "
+                    f"elapsed={float(row['elapsed_seconds']):.3f}s, "
+                    f"loss={float(row['loss']):.3e}, "
+                    f"rel={float(row['relative_error']):.3e}"
+                )
 
     summary = write_summary(rows, args.outdir)
-    pivot = write_timing_pivot(rows, args.outdir, cases, methods)
-    timing_plot = plot_timing(rows, args.outdir, cases, methods)
-    preview = make_preview_sheet(rows, args.outdir, cases, methods)
+    pivot = write_timing_pivot(rows, args.outdir, cases, methods, alphas)
+    timing_plot = plot_timing(rows, args.outdir, cases, methods, alphas)
+    preview = make_preview_sheet(rows, args.outdir, cases, methods, alphas)
 
     print(f"summary={summary}")
     print(f"timing_pivot={pivot}")

@@ -29,6 +29,44 @@ PAPER_COLORMAP = "jet"
 PAPER_SHADING = "gouraud"
 
 
+def float_token(value):
+    return f"{float(value):.2f}".replace(".", "p")
+
+
+def resolve_case_alpha(args, default):
+    value = getattr(args, "alpha", None)
+    return float(default if value is None else value)
+
+
+def resolve_burgers_data_path(explicit_path, alpha, data_dir=Path("data")):
+    if explicit_path is not None:
+        return Path(explicit_path)
+    token = f"{int(round(float(alpha) * 100)):03d}"
+    path = data_dir / f"burgers_{token}.npz"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing Burgers reference for alpha={alpha:.2f}: {path}. "
+            "Pass --burgers-data to use a custom reference file."
+        )
+    return path
+
+
+def resolve_lshape_data_path(explicit_path, alpha, data_dir=Path("data/lshape")):
+    if explicit_path is not None:
+        return Path(explicit_path)
+    if alpha is None:
+        return data_dir / "lshape_reference.npz"
+
+    path = data_dir / f"lshape_reference_alpha{float_token(alpha)}.npz"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing L-shape reference for alpha={float(alpha):.2f}: {path}. "
+            "Generate it with reference_solvers/lshape_2d/generate_lshape_reference.py "
+            "--tag-alpha or pass --lshape-data."
+        )
+    return path
+
+
 def model_cfg(input_dim, hidden_dim=32, num_layers=3):
     return OmegaConf.create({
         "arch_name": "mlp",
@@ -196,11 +234,13 @@ def plot_2d_time_slice_files(case_name, x_grid, y_grid, true_grids, pred_grids,
 
 
 def make_burgers(args):
-    data = np.load(args.burgers_data)
+    alpha = resolve_case_alpha(args, 1.5)
+    data_path = resolve_burgers_data_path(args.burgers_data, alpha)
+    data = np.load(data_path)
     t_full, x_full = data["t"], data["x"]
     cfg = OmegaConf.create({
-        "al": 1.5,
-        "beta": 2.0,
+        "al": alpha,
+        "beta": 0.0,
         "xlim": [[float(x_full[0]), float(x_full[-1])]],
         "tlim": [float(t_full[0]), float(t_full[-1])],
         "method": args.method,
@@ -237,6 +277,7 @@ def make_burgers(args):
     paths, rel_err = plot_1d_case(case_name, t_grid, x_grid, true, pred, args.outdir)
     return {
         "case": "burgers",
+        "alpha": alpha,
         "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
@@ -246,8 +287,9 @@ def make_burgers(args):
 
 
 def make_forward(args):
+    alpha = resolve_case_alpha(args, 1.75)
     cfg = OmegaConf.create({
-        "al": 1.75,
+        "al": alpha,
         "k": 1,
         "lam": 1.0,
         "a": 1.0,
@@ -286,6 +328,7 @@ def make_forward(args):
     paths, rel_err = plot_1d_case(case_name, t_grid, x_grid, true, pred, args.outdir)
     return {
         "case": "forward",
+        "alpha": alpha,
         "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
@@ -295,8 +338,9 @@ def make_forward(args):
 
 
 def make_irregular_hole(args):
+    alpha = resolve_case_alpha(args, 1.5)
     cfg = OmegaConf.create({
-        "al": 1.5,
+        "al": alpha,
         "tlim": [0, 1],
         "method": args.method,
         "center": [-0.3, 0.2],
@@ -360,6 +404,7 @@ def make_irregular_hole(args):
     )
     return {
         "case": "irregular_hole",
+        "alpha": alpha,
         "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
@@ -369,7 +414,12 @@ def make_irregular_hole(args):
 
 
 def lshape_reference_slices(args):
-    data = np.load(args.lshape_data)
+    requested_alpha = getattr(args, "alpha", None)
+    ref_path = resolve_lshape_data_path(
+        getattr(args, "lshape_data", None),
+        requested_alpha,
+    )
+    data = np.load(ref_path)
     times = data["times"]
     x_grid = data["x_grid"]
     y_grid = data["y_grid"]
@@ -380,7 +430,13 @@ def lshape_reference_slices(args):
             float(data["diffusion_scale"]) if "diffusion_scale" in data else 1.0
         ),
         "t_final": float(data["t_final"]) if "t_final" in data else float(times[-1]),
+        "reference_data": str(ref_path),
     }
+    if requested_alpha is not None and not np.isclose(meta["alpha"], float(requested_alpha)):
+        raise ValueError(
+            f"L-shape reference alpha mismatch: requested {float(requested_alpha):.2f}, "
+            f"but {ref_path} stores alpha={meta['alpha']:.2f}"
+        )
     requested_times = (
         parse_time_slices(args.time_slices)
         if args.time_slices
@@ -450,6 +506,7 @@ def make_lshape(args):
     )
     return {
         "case": "lshape",
+        "alpha": meta["alpha"],
         "method": args.method,
         "path": ";".join(str(path) for path in paths),
         "relative_error": rel_err,
@@ -464,9 +521,16 @@ def write_summary(outdir, row):
     if path.exists():
         with path.open("r", newline="") as f:
             rows = list(csv.DictReader(f))
-        rows = [r for r in rows if r["case"] != row["case"]]
+        rows = [
+            r for r in rows
+            if not (
+                r["case"] == row["case"]
+                and float(r.get("alpha", "nan")) == float(row["alpha"])
+            )
+        ]
     rows.append({
         "case": row["case"],
+        "alpha": f"{row['alpha']:.8e}",
         "relative_error": f"{row['relative_error']:.8e}",
         "final_smoke_loss": f"{row['loss']:.8e}",
         "figure": row["path"],
@@ -474,7 +538,7 @@ def write_summary(outdir, row):
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["case", "relative_error", "final_smoke_loss", "figure"],
+            fieldnames=["case", "alpha", "relative_error", "final_smoke_loss", "figure"],
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -500,9 +564,9 @@ def main():
     parser.add_argument("--time-slices", default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--outdir", type=Path, default=Path("outputs/smoke_results"))
-    parser.add_argument("--burgers-data", type=Path, default=Path("data/burgers_150.npz"))
-    parser.add_argument("--lshape-data", type=Path,
-                        default=Path("data/lshape/lshape_reference.npz"))
+    parser.add_argument("--alpha", type=float, default=None)
+    parser.add_argument("--burgers-data", type=Path, default=None)
+    parser.add_argument("--lshape-data", type=Path, default=None)
     args = parser.parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
 
@@ -515,6 +579,7 @@ def main():
     row = makers[args.case](args)
     summary = write_summary(args.outdir, row)
     print(f"case={row['case']}")
+    print(f"alpha={row['alpha']:.8e}")
     print(f"method={row['method']}")
     print(f"relative_error={row['relative_error']:.8e}")
     print(f"final_smoke_loss={row['loss']:.8e}")

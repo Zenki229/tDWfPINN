@@ -5,12 +5,12 @@ set -Eeuo pipefail
 #
 # Output:
 #   outputs/stress_results/<RUN_ID>/
-#     summary.csv                 full table with loss, relative error, timing, and figure paths
-#     timing_seconds_pivot.csv    seconds per 5000 steps for GJ-I/GJ-II/MC-I/MC-II
+#     summary.csv                 full table with alpha, loss, relative error, timing, and figure paths
+#     timing_seconds_pivot.csv    seconds per 5000 steps by case/alpha/method
 #     timing_axes.csv             average Type-I/Type-II and GJ/MC timings
 #     timing_seconds.png          timing bar chart
 #     abs_error_preview.png       overview image of abs-error panels
-#     parts/<case>_<method>/      per-run figures and logs
+#     parts/<case>_alpha<alpha>_<method>/  per-run figures and logs
 #
 # Typical use:
 #   bash scripts/server/run_stress_all.sh
@@ -21,6 +21,7 @@ set -Eeuo pipefail
 # Useful overrides:
 #   ENV_NAME=sciml bash scripts/server/run_stress_all.sh
 #   STEPS=5000 GJ_QUAD=64 MC_QUAD=640 bash scripts/server/run_stress_all.sh
+#   ALPHAS=1.25,1.5,1.75 bash scripts/server/run_stress_all.sh lshape
 #   CASES=forward,burgers METHODS=GJ-II,MC-II bash scripts/server/run_stress_all.sh
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -68,6 +69,10 @@ METHODS="${2:-${METHODS:-GJ-I,GJ-II,MC-I,MC-II}}"
 # 5000 steps, so STEPS=5000 gives one timing measurement per run.
 STEPS="${STEPS:-5000}"
 
+# ALPHAS: comma-separated fractional orders. Each case/method is run once for
+# every listed alpha. Use ALPHAS=1.5 for a single-order rerun.
+ALPHAS="${ALPHAS:-1.25,1.5,1.75}"
+
 # GJ_QUAD / MC_QUAD: number of quadrature points/samples used inside each
 # fractional derivative evaluation. For quick stress tests use 3. For paper
 # scale, typical values are GJ_QUAD=64 and MC_QUAD=640.
@@ -97,51 +102,56 @@ CONTINUE_ON_FAIL="${CONTINUE_ON_FAIL:-1}"
 
 IFS=',' read -r -a CASE_ARRAY <<< "${CASES}"
 IFS=',' read -r -a METHOD_ARRAY <<< "${METHODS}"
+IFS=',' read -r -a ALPHA_ARRAY <<< "${ALPHAS}"
 
 SUMMARY_ARGS=()
 FAILED_RUNS=()
 
 for case_name in "${CASE_ARRAY[@]}"; do
-  for method_name in "${METHOD_ARRAY[@]}"; do
-    safe_method="${method_name//-/_}"
-    part_dir="${OUTDIR}/parts/${case_name}_${safe_method}"
-    mkdir -p "${part_dir}"
+  for alpha_value in "${ALPHA_ARRAY[@]}"; do
+    alpha_safe="${alpha_value//./p}"
+    for method_name in "${METHOD_ARRAY[@]}"; do
+      safe_method="${method_name//-/_}"
+      part_dir="${OUTDIR}/parts/${case_name}_alpha${alpha_safe}_${safe_method}"
+      mkdir -p "${part_dir}"
 
-    echo "============================================================"
-    echo "case=${case_name}, method=${method_name}, steps=${STEPS}"
-    echo "outdir=${part_dir}"
-    echo "============================================================"
+      echo "============================================================"
+      echo "case=${case_name}, alpha=${alpha_value}, method=${method_name}, steps=${STEPS}"
+      echo "outdir=${part_dir}"
+      echo "============================================================"
 
-    cmd=(
-      python scripts/run_stress_tests.py
-      --cases "${case_name}"
-      --methods "${method_name}"
-      --steps "${STEPS}"
-      --gj-quad "${GJ_QUAD}"
-      --mc-quad "${MC_QUAD}"
-      --batch-in-1d "${BATCH_IN_1D}"
-      --batch-in-2d "${BATCH_IN_2D}"
-      --batch-bd "${BATCH_BD}"
-      --batch-init "${BATCH_INIT}"
-      --hidden-dim "${HIDDEN_DIM}"
-      --num-layers "${NUM_LAYERS}"
-      --grid-1d "${GRID_1D}"
-      --grid-2d "${GRID_2D}"
-      --outdir "${part_dir}"
-    )
-    if [[ -n "${TIME_SLICES}" ]]; then
-      cmd+=(--time-slices "${TIME_SLICES}")
-    fi
-
-    if "${cmd[@]}" 2>&1 | tee "${part_dir}/run.log"; then
-      SUMMARY_ARGS+=(--summary "${part_dir}/summary.csv")
-    else
-      FAILED_RUNS+=("${case_name}/${method_name}")
-      echo "WARNING: failed case=${case_name}, method=${method_name}" | tee -a "${OUTDIR}/failed_runs.log"
-      if [[ "${CONTINUE_ON_FAIL}" != "1" ]]; then
-        exit 1
+      cmd=(
+        python scripts/run_stress_tests.py
+        --cases "${case_name}"
+        --methods "${method_name}"
+        --alpha "${alpha_value}"
+        --steps "${STEPS}"
+        --gj-quad "${GJ_QUAD}"
+        --mc-quad "${MC_QUAD}"
+        --batch-in-1d "${BATCH_IN_1D}"
+        --batch-in-2d "${BATCH_IN_2D}"
+        --batch-bd "${BATCH_BD}"
+        --batch-init "${BATCH_INIT}"
+        --hidden-dim "${HIDDEN_DIM}"
+        --num-layers "${NUM_LAYERS}"
+        --grid-1d "${GRID_1D}"
+        --grid-2d "${GRID_2D}"
+        --outdir "${part_dir}"
+      )
+      if [[ -n "${TIME_SLICES}" ]]; then
+        cmd+=(--time-slices "${TIME_SLICES}")
       fi
-    fi
+
+      if "${cmd[@]}" 2>&1 | tee "${part_dir}/run.log"; then
+        SUMMARY_ARGS+=(--summary "${part_dir}/summary.csv")
+      else
+        FAILED_RUNS+=("${case_name}/alpha${alpha_value}/${method_name}")
+        echo "WARNING: failed case=${case_name}, alpha=${alpha_value}, method=${method_name}" | tee -a "${OUTDIR}/failed_runs.log"
+        if [[ "${CONTINUE_ON_FAIL}" != "1" ]]; then
+          exit 1
+        fi
+      fi
+    done
   done
 done
 
@@ -150,6 +160,7 @@ if [[ "${#SUMMARY_ARGS[@]}" -gt 0 ]]; then
     --outdir "${OUTDIR}" \
     --cases "${CASES}" \
     --methods "${METHODS}" \
+    --alphas "${ALPHAS}" \
     "${SUMMARY_ARGS[@]}"
 else
   echo "No successful runs; nothing to combine." >&2
@@ -164,24 +175,26 @@ from pathlib import Path
 summary = Path(sys.argv[1])
 out = Path(sys.argv[2])
 rows = list(csv.DictReader(summary.open(newline="")))
-cases = []
+groups = []
 for row in rows:
-    if row["case"] not in cases:
-        cases.append(row["case"])
+    key = (row["case"], row["alpha"])
+    if key not in groups:
+        groups.append(key)
 
 with out.open("w", newline="") as f:
     writer = csv.DictWriter(
         f,
-        fieldnames=["case", "type_i_seconds", "type_ii_seconds", "gj_seconds", "mc_seconds"],
+        fieldnames=["case", "alpha", "type_i_seconds", "type_ii_seconds", "gj_seconds", "mc_seconds"],
     )
     writer.writeheader()
-    for case in cases:
-        items = [row for row in rows if row["case"] == case]
+    for case, alpha in groups:
+        items = [row for row in rows if row["case"] == case and row["alpha"] == alpha]
         def avg(key, value):
             vals = [float(row["elapsed_seconds"]) for row in items if row[key] == value]
             return sum(vals) / len(vals) if vals else float("nan")
         writer.writerow({
             "case": case,
+            "alpha": alpha,
             "type_i_seconds": f"{avg('type', 'I'):.8f}",
             "type_ii_seconds": f"{avg('type', 'II'):.8f}",
             "gj_seconds": f"{avg('quadrature', 'GJ'):.8f}",

@@ -396,7 +396,7 @@ def run(outdir: Path) -> None:
         ax.plot(alphas, sanitize_for_plot(results[spec.key]["q2_local_rel"]), color=spec.color, ls=spec.linestyle, lw=1.2, label=spec.label)
     ax.set_yscale("log")
     ax.set_xlabel(r"fractional order $\alpha$")
-    ax.set_ylabel("relative local quotient error")
+    ax.set_ylabel("relative error")
     ax.set_title(r"Type-II quotient at $\tau_{\min}$")
     ax.set_ylim(1e-16, 1e8)
     ax.legend(ncol=2, frameon=False, loc="upper left")

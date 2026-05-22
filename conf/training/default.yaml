@@ -7,6 +7,10 @@ beta1: 0.9
 beta2: 0.999
 eps: 1.0e-8
 grad_accum_steps: 1
+lbfgs:
+  use: false
+  lr: 1.0e-2
+  history_size: 10
 
 # Training loop
 max_steps: 10000

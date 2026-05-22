@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 .claude/
+dev_log/
 .pytest_cache/
 jaxpi/
 pinns-jax/
@@ -10,7 +11,9 @@ __pycache__/
 **/results/
 **/outputs/
 !outputs/
+outputs/*
 outputs/stress_results/
+outputs/debug_alpha_stress*/
 !outputs/smoke_results/
 !outputs/smoke_results/*.png
 !outputs/smoke_results/summary.csv

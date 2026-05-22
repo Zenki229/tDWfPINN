@@ -199,7 +199,7 @@ Outputs are written to:
 | --- | --- |
 | `forward_1d/generate_forward_reference_gif.py` | `data/reference_1d/forward_alpha1p75_reference.gif` |
 | `burgers_1d/generate_burgers_reference_gifs.py` | `data/reference_1d/burgers_alpha*_reference.gif` and `burgers_reference_summary.csv` |
-| `irregular_hole_2d/generate_irregular_hole_reference.py` | `data/irregular_hole/irregular_hole_reference.npz`, `irregular_hole_reference.gif`, `irregular_hole_exact.gif` |
+| `irregular_hole_2d/generate_irregular_hole_reference.py` | `data/irregular_hole/irregular_hole_reference.npz`, `irregular_hole_reference.gif`, `irregular_hole_exact.gif`; use `--tag-alpha` for alpha-specific files |
 | `lshape_2d/generate_lshape_reference.py` | `data/lshape/lshape_reference.npz`, `lshape_reference.gif`; README preview `lshape_reference_T5.gif` |
 
 Detailed options are in [`reference_solvers/README.md`](reference_solvers/README.md).
@@ -232,10 +232,21 @@ python jax_forward.py pde=forward training.max_steps=50000 pde.GJ.nums=80 wandb.
 python jax_irregular.py pde=lshape training.max_steps=50000 training.batch.in=20000 pde.GJ.nums=64 wandb.mode=online
 ```
 
+Two-dimensional irregular cases can also be launched with residual-adaptive
+interior sampling and Optax L-BFGS:
+
+```bash
+python jax_irregular.py pde=irregular_hole training.optimizer=lbfgs training.lbfgs.lr=0.01 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
+python jax_irregular.py pde=lshape training.optimizer=lbfgs training.lbfgs.lr=0.01 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
+```
+
+The current L-BFGS path disables Optax line search so it can run through the
+same stochastic pmapped training step as Adam.
+
 Each training run is saved under a timestamped Hydra directory:
 
 ```text
-outputs/<pde.name>/<YYYY-MM-DD_HH-MM-SS>/
+outputs/<pde.name>/<method>/alpha<alpha>/<YYYY-MM-DD_HH-MM-SS>/
 ```
 
 The run directory contains `.hydra/`, `timing.csv`, and `checkpoints/`. Periodic
@@ -256,6 +267,22 @@ Then run with online logging:
 python jax_forward.py pde=forward wandb.mode=online wandb.project=tDWfPINN wandb.entity=<your-entity>
 ```
 
+When `wandb.name` is not set, the JAX entry points generate a descriptive name:
+
+```text
+<case>_alpha<alpha>_<method>_<quad><points>_steps<steps>_seed<seed>
+```
+
+For example:
+
+```text
+lshape_alpha1p25_GJ-II_GJ64_steps5000_seed42
+```
+
+The default W&B group is `<case>_alpha<alpha>`, so Type I/Type II and GJ/MC
+runs for the same PDE and fractional order are easy to compare. Override
+`wandb.name` or `wandb.group` only when you need a custom naming scheme.
+
 Use `wandb.mode=disabled` for local smoke tests or offline machines. The
 default W&B settings are in [`conf/config.yaml`](conf/config.yaml).
 
@@ -272,11 +299,29 @@ python scripts/generate_smoke_results.py --case irregular_hole
 python scripts/generate_smoke_results.py --case lshape
 ```
 
+Pass `--alpha` to select the fractional order. For L-shape this also selects
+the matching tagged reference archive, for example
+`data/lshape/lshape_reference_alpha1p25.npz`.
+
+```bash
+python scripts/generate_smoke_results.py --case lshape --alpha 1.25
+```
+
 The summary is written to:
 
 ```text
 outputs/smoke_results/summary.csv
 ```
+
+For server stress runs over the paper orders `alpha=1.25,1.5,1.75`:
+
+```bash
+STEPS=5000 GJ_QUAD=64 MC_QUAD=640 bash scripts/server/run_stress_all.sh lshape GJ-I,GJ-II,MC-I,MC-II
+ALPHAS=1.5 bash scripts/server/run_stress_case.sh irregular_hole GJ-II,MC-II
+```
+
+Stress summaries include `case`, `alpha`, method, timing, loss, relative error,
+and generated figure paths.
 
 ## Timing
 

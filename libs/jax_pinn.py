@@ -185,6 +185,21 @@ def create_model(key, config):
 
 
 def _create_optimizer(config):
+    optimizer_name = str(_cfg_get(config, 'optimizer', 'adam')).lower()
+    lbfgs_cfg = _cfg_get(config, 'lbfgs')
+    use_lbfgs = optimizer_name == 'lbfgs' or bool(_cfg_get(lbfgs_cfg, 'use', False))
+    if use_lbfgs:
+        lr = _cfg_get(lbfgs_cfg, 'learning_rate',
+                      _cfg_get(lbfgs_cfg, 'lr', _cfg_get(config, 'learning_rate', 1e-2)))
+        history_size = int(_cfg_get(lbfgs_cfg, 'history_size', 10))
+        # Keep line search disabled so the optimizer works with Flax TrainState
+        # and the existing stochastic pmapped training step.
+        return optax.lbfgs(
+            learning_rate=lr,
+            memory_size=history_size,
+            linesearch=None,
+        )
+
     lr = _cfg_get(config, 'learning_rate', _cfg_get(config, 'lr', 1e-3))
     schedule = optax.exponential_decay(
         init_value=lr,

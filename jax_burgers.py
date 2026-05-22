@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from libs.jax_evaluator import BaseEvaluator
 from libs.jax_pde_burgers import JAXDWBurgers
 from libs.jax_pinn import create_train_state
+from libs.jax_run_metadata import prepare_wandb_run, wandb_init_kwargs
 from libs.jax_sample import TimeSpaceEasySampler
 from libs.jax_utils import (
     EpochTimer,
@@ -22,16 +23,14 @@ from libs.jax_utils import (
 
 @hydra.main(config_path="conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    prepare_wandb_run(cfg)
     if cfg.wandb.mode != "disabled":
-        wandb.init(
-            project=cfg.wandb.project,
-            entity=cfg.wandb.entity,
-            mode=cfg.wandb.mode,
-            config=OmegaConf.to_container(cfg, resolve=True),
-        )
+        wandb.init(**wandb_init_kwargs(cfg))
 
     n_devices = jax.local_device_count()
     print(f"[*] Running on {n_devices} device(s): {jax.devices()}")
+    print(f"[*] Run name: {cfg.wandb.name}")
+    print(f"[*] W&B group: {cfg.wandb.group}")
 
     root_key = jax.random.PRNGKey(cfg.seed)
     root_key, model_key = jax.random.split(root_key)

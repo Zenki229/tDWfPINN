@@ -175,8 +175,7 @@ class IrregularHoleSampler(BaseEasySampler):
         points = {}
 
         size_in = self.batch["in"]
-        xy_in = self._sample_spatial(size_in)
-        points["in"] = np.column_stack([self._sample_time(size_in), xy_in])
+        points["in"] = self.sample_interior(size_in)
 
         points["bd"] = self._sample_boundary(self.batch["bd"])
 
@@ -184,6 +183,10 @@ class IrregularHoleSampler(BaseEasySampler):
         xy_init = self._sample_spatial(size_init)
         points["init"] = np.column_stack([np.zeros(size_init), xy_init])
         return points
+
+    def sample_interior(self, size):
+        xy = self._sample_spatial(size)
+        return np.column_stack([self._sample_time(size), xy])
 
 
 class LShapeSampler(BaseEasySampler):
@@ -255,8 +258,7 @@ class LShapeSampler(BaseEasySampler):
         points = {}
 
         size_in = self.batch["in"]
-        xy_in = self._sample_spatial(size_in)
-        points["in"] = np.column_stack([self._sample_time(size_in), xy_in])
+        points["in"] = self.sample_interior(size_in)
 
         points["bd"] = self._sample_boundary(self.batch["bd"])
 
@@ -264,3 +266,7 @@ class LShapeSampler(BaseEasySampler):
         xy_init = self._sample_spatial(size_init)
         points["init"] = np.column_stack([np.zeros(size_init), xy_init])
         return points
+
+    def sample_interior(self, size):
+        xy = self._sample_spatial(size)
+        return np.column_stack([self._sample_time(size), xy])

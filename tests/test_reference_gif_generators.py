@@ -12,6 +12,7 @@ from reference_solvers.forward_1d.generate_forward_reference_gif import forward_
 from reference_solvers.irregular_hole_2d.generate_irregular_hole_reference import (
     HoleConfig,
     exact_solution,
+    float_token as hole_float_token,
 )
 
 
@@ -46,3 +47,8 @@ def test_irregular_hole_exact_solution_has_zero_initial_state():
     y = np.array([0.1, -0.4])
     np.testing.assert_allclose(exact_solution(0.0, x, y, cfg), 0.0)
     np.testing.assert_allclose(exact_solution(1.0, x, y, cfg), 0.0)
+
+
+def test_irregular_hole_alpha_token_matches_reference_names():
+    assert hole_float_token(1.25) == "1p25"
+    assert hole_float_token(1.5) == "1p50"

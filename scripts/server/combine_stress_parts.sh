@@ -34,6 +34,7 @@ OUTDIR="${OUTDIR:-outputs/stress_results/latest}"
 # CASES/METHODS define display order in the merged tables and plots.
 CASES="${CASES:-forward,burgers,irregular_hole,lshape}"
 METHODS="${METHODS:-GJ-I,GJ-II,MC-I,MC-II}"
+ALPHAS="${ALPHAS:-1.25,1.5,1.75}"
 
 if [[ ! -d "${OUTDIR}" ]]; then
   echo "OUTDIR does not exist: ${OUTDIR}" >&2
@@ -58,6 +59,7 @@ python scripts/combine_stress_results.py \
   --outdir "${OUTDIR}" \
   --cases "${CASES}" \
   --methods "${METHODS}" \
+  --alphas "${ALPHAS}" \
   "${SUMMARY_ARGS[@]}"
 
 python - <<'PY' "${OUTDIR}/summary.csv" "${OUTDIR}/timing_axes.csv"
@@ -68,24 +70,26 @@ from pathlib import Path
 summary = Path(sys.argv[1])
 out = Path(sys.argv[2])
 rows = list(csv.DictReader(summary.open(newline="")))
-cases = []
+groups = []
 for row in rows:
-    if row["case"] not in cases:
-        cases.append(row["case"])
+    key = (row["case"], row["alpha"])
+    if key not in groups:
+        groups.append(key)
 
 with out.open("w", newline="") as f:
     writer = csv.DictWriter(
         f,
-        fieldnames=["case", "type_i_seconds", "type_ii_seconds", "gj_seconds", "mc_seconds"],
+        fieldnames=["case", "alpha", "type_i_seconds", "type_ii_seconds", "gj_seconds", "mc_seconds"],
     )
     writer.writeheader()
-    for case in cases:
-        items = [row for row in rows if row["case"] == case]
+    for case, alpha in groups:
+        items = [row for row in rows if row["case"] == case and row["alpha"] == alpha]
         def avg(key, value):
             vals = [float(row["elapsed_seconds"]) for row in items if row[key] == value]
             return sum(vals) / len(vals) if vals else float("nan")
         writer.writerow({
             "case": case,
+            "alpha": alpha,
             "type_i_seconds": f"{avg('type', 'I'):.8f}",
             "type_ii_seconds": f"{avg('type', 'II'):.8f}",
             "gj_seconds": f"{avg('quadrature', 'GJ'):.8f}",
