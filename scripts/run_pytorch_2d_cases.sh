@@ -13,6 +13,9 @@ set -euo pipefail
 #
 # Environment variables:
 #   STEPS               Adam update steps. Default: 5000.
+#   STEPS_PER_EPOCH     Adam updates per hybrid epoch. Default: 5000.
+#   USE_LBFGS           Enable Adam + L-BFGS hybrid schedule. Default: 0.
+#   LBFGS_MAX_ITER      L-BFGS iterations per hybrid epoch. Default: 10.
 #   TIMING_EPOCH_STEPS  Steps per timing row. Default: 5000.
 #   DOMAIN_BATCH        Interior collocation batch size. Default: 64.
 #   BOUNDARY_BATCH      Boundary batch size. Default: 16.
@@ -29,6 +32,9 @@ CASE_NAME="${1:-all}"
 METHODS_CSV="${2:-GJ-I,GJ-II,MC-I,MC-II}"
 
 STEPS="${STEPS:-5000}"
+STEPS_PER_EPOCH="${STEPS_PER_EPOCH:-5000}"
+USE_LBFGS="${USE_LBFGS:-0}"
+LBFGS_MAX_ITER="${LBFGS_MAX_ITER:-10}"
 TIMING_EPOCH_STEPS="${TIMING_EPOCH_STEPS:-5000}"
 DOMAIN_BATCH="${DOMAIN_BATCH:-64}"
 BOUNDARY_BATCH="${BOUNDARY_BATCH:-16}"
@@ -55,12 +61,14 @@ for case in "${CASES[@]}"; do
     run_dir="outputs/pytorch_2d/${case}/${method}/${run_stamp}"
     echo "Running case=${case}, method=${method}, steps=${STEPS}, output=${run_dir}"
 
-    "${PYTHON_BIN}" src/train.py \
+    cmd=(
+      "${PYTHON_BIN}" src/train.py
       "pde=${case}" \
       plot=matplotlib \
       "wandb.mode=${WANDB_MODE}" \
       "pde.method=${method}" \
       "trainer.max_steps=${STEPS}" \
+      "trainer.steps_per_epoch=${STEPS_PER_EPOCH}" \
       "trainer.timing.epoch_steps=${TIMING_EPOCH_STEPS}" \
       "trainer.batch_size.domain=${DOMAIN_BATCH}" \
       "trainer.batch_size.boundary=${BOUNDARY_BATCH}" \
@@ -73,5 +81,13 @@ for case in "${CASES[@]}"; do
       "model.num_layers=${NUM_LAYERS}" \
       "pde.plot_grid=${PLOT_GRID}" \
       "hydra.run.dir=${run_dir}"
+    )
+    if [[ "${USE_LBFGS}" == "1" ]]; then
+      cmd+=(
+        optimizer.lbfgs.use=true
+        "optimizer.lbfgs.max_iter=${LBFGS_MAX_ITER}"
+      )
+    fi
+    "${cmd[@]}"
   done
 done

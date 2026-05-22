@@ -41,5 +41,11 @@ def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> wandb.run:
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
         dir=os.getcwd(),
     )
+    wandb.define_metric("train/loss_event")
+    wandb.define_metric("train/loss_continuous", step_metric="train/loss_event")
+    wandb.define_metric("train/adam_loss", step_metric="train/loss_event")
+    wandb.define_metric("train/lbfgs_loss", step_metric="train/loss_event")
+    wandb.define_metric("train/adam_step")
+    wandb.define_metric("timing/*", step_metric="train/adam_step")
     log.info(f"WandB initialized for project {cfg.wandb.project}")
     return run 

@@ -190,6 +190,19 @@ python src/train.py pde=irregular_hole plot=matplotlib wandb.mode=disabled train
 python src/train.py pde=lshape plot=matplotlib wandb.mode=disabled trainer.max_steps=1 trainer.timing.epoch_steps=1 trainer.batch_size.domain=4 trainer.batch_size.boundary=2 trainer.batch_size.initial=2 trainer.rad.use=false pde.gj_params.nums=3 pde.gauss_jacobi_params.nums=3 pde.monte_carlo_params.nums=3 model.hidden_dim=8 model.num_layers=1
 ```
 
+Enable the Adam + L-BFGS hybrid schedule with `optimizer.lbfgs.use=true`:
+
+```bash
+python src/train.py pde=irregular_hole plot=matplotlib wandb.mode=disabled optimizer.lbfgs.use=true trainer.max_steps=10000 trainer.steps_per_epoch=5000 optimizer.lbfgs.max_iter=10 optimizer.lbfgs.lr=0.01 trainer.rad.use=true
+python src/train.py pde=lshape plot=matplotlib wandb.mode=disabled optimizer.lbfgs.use=true trainer.max_steps=10000 trainer.steps_per_epoch=5000 optimizer.lbfgs.max_iter=10 optimizer.lbfgs.lr=0.01 trainer.rad.use=true
+```
+
+For this path, `epochs = trainer.max_steps // trainer.steps_per_epoch`. Each
+epoch samples one batch, applies RAD when enabled, runs Adam for
+`trainer.steps_per_epoch` updates on that batch, then runs one PyTorch L-BFGS
+phase using `optimizer.lbfgs.max_iter`. Timing records only the Adam phase, and
+both Adam and L-BFGS losses are logged.
+
 ## 2D Method Timing Runs
 
 Use the server script to run both irregular-domain cases across Type-I,
@@ -210,6 +223,9 @@ Important script parameters:
 | Variable | Meaning | Default |
 | --- | --- | --- |
 | `STEPS` | Adam update steps | `5000` |
+| `STEPS_PER_EPOCH` | Adam updates per hybrid epoch | `5000` |
+| `USE_LBFGS` | Enable hybrid Adam + L-BFGS | `0` |
+| `LBFGS_MAX_ITER` | L-BFGS iterations per hybrid epoch | `10` |
 | `TIMING_EPOCH_STEPS` | Steps per timing row | `5000` |
 | `DOMAIN_BATCH` | Interior collocation batch size | `64` |
 | `BOUNDARY_BATCH` | Boundary batch size | `16` |
@@ -247,7 +263,7 @@ Each run directory contains:
 The timing file has this schema:
 
 ```text
-epoch,step,epoch_steps,elapsed_seconds,total_seconds,average_epoch_seconds,loss
+epoch,step,epoch_steps,elapsed_seconds,total_seconds,average_epoch_seconds,loss,adam_loss,lbfgs_loss
 ```
 
 By default, one timing epoch is `5000` Adam steps, matching the paper's timing
@@ -264,6 +280,11 @@ python src/train.py pde=lshape wandb.mode=online wandb.project=tDWfPINN wandb.en
 
 Set `wandb.mode=offline` on machines without network access but where you still
 want local W&B logs.
+
+Hybrid runs log `train/loss_continuous` against `train/loss_event`, with one
+event after the Adam phase and one event after the L-BFGS phase. The raw phase
+metrics are also logged as `train/adam_loss` and `train/lbfgs_loss`, while
+`train/adam_step` preserves the Adam-update axis.
 
 ## Tests
 

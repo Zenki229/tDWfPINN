@@ -37,6 +37,26 @@ PDE_REGISTRY = {
 }
 
 
+def _cfg_get(config, name, default=None):
+    if config is None:
+        return default
+    if isinstance(config, dict):
+        return config.get(name, default)
+    try:
+        return getattr(config, name)
+    except (AttributeError, KeyError):
+        return default
+
+
+def _lbfgs_enabled(cfg: DictConfig) -> bool:
+    optimizer_name = str(_cfg_get(cfg.optimizer, "name", "adam")).lower()
+    lbfgs_cfg = _cfg_get(cfg.optimizer, "lbfgs")
+    return (
+        optimizer_name in {"lbfgs", "adam_lbfgs", "adam+lbfgs", "hybrid"}
+        or bool(_cfg_get(lbfgs_cfg, "use", False))
+    )
+
+
 class Trainer:
     def __init__(self, cfg: DictConfig, run: wandb.run):
         self.cfg = cfg
@@ -64,6 +84,9 @@ class Trainer:
         
         # Optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=cfg.optimizer.lr)
+        self.use_hybrid_lbfgs = _lbfgs_enabled(cfg)
+        self.lbfgs_optimizer = None
+        self.loss_event = 0
         
         # Plotter
         plot_backend = "plotly"
@@ -117,6 +140,7 @@ class Trainer:
         self.timing_start = None
         self.timing_epoch_start = None
         self.timing_epochs = []
+        self.timing_external_elapsed = False
         if self.timing_enabled:
             with open(self.timing_path, "w", newline="") as f:
                 writer = csv.DictWriter(
@@ -129,18 +153,21 @@ class Trainer:
                         "total_seconds",
                         "average_epoch_seconds",
                         "loss",
+                        "adam_loss",
+                        "lbfgs_loss",
                     ],
                 )
                 writer.writeheader()
 
-    def _record_timing(self, step: int, loss_value: float):
-        if not self.timing_enabled or step % self.timing_epoch_steps != 0:
-            return
-        if self.device.type == "cuda":
-            torch.cuda.synchronize(self.device)
-        now = time.perf_counter()
-        elapsed = now - self.timing_epoch_start
-        total = now - self.timing_start
+    def _write_timing_record(
+        self,
+        step: int,
+        elapsed: float,
+        total: float,
+        loss_value: float,
+        adam_loss_value: float = None,
+        lbfgs_loss_value: float = None,
+    ):
         self.timing_epochs.append(elapsed)
         row = {
             "epoch": len(self.timing_epochs),
@@ -150,148 +177,256 @@ class Trainer:
             "total_seconds": f"{total:.8f}",
             "average_epoch_seconds": f"{float(np.mean(self.timing_epochs)):.8f}",
             "loss": f"{loss_value:.8e}",
+            "adam_loss": f"{adam_loss_value:.8e}" if adam_loss_value is not None else "",
+            "lbfgs_loss": f"{lbfgs_loss_value:.8e}" if lbfgs_loss_value is not None else "",
         }
         with open(self.timing_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row.keys()))
             writer.writerow(row)
-        self.timing_epoch_start = now
         log.info(
             "Timing epoch %s at step %s: %.3f seconds",
             row["epoch"],
             step,
             elapsed,
         )
+        timing_log = {
+            "timing/epoch": int(row["epoch"]),
+            "timing/elapsed_seconds": elapsed,
+            "timing/average_epoch_seconds": float(np.mean(self.timing_epochs)),
+            "timing/loss": loss_value,
+            "train/adam_step": step,
+        }
+        if adam_loss_value is not None:
+            timing_log["timing/adam_loss"] = adam_loss_value
+        if lbfgs_loss_value is not None:
+            timing_log["timing/lbfgs_loss"] = lbfgs_loss_value
+        wandb.log(timing_log)
+
+    def _record_timing(self, step: int, loss_value: float):
+        if not self.timing_enabled or step % self.timing_epoch_steps != 0:
+            return
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+        now = time.perf_counter()
+        elapsed = now - self.timing_epoch_start
+        total = now - self.timing_start
+        self.timing_epoch_start = now
+        self._write_timing_record(step, elapsed, total, loss_value)
+
+    def _record_timing_elapsed(
+        self,
+        step: int,
+        elapsed: float,
+        loss_value: float,
+        adam_loss_value: float = None,
+        lbfgs_loss_value: float = None,
+    ):
+        if not self.timing_enabled:
+            return
+        self.timing_external_elapsed = True
+        total = float(np.sum(self.timing_epochs) + elapsed)
+        self._write_timing_record(
+            step,
+            elapsed,
+            total,
+            loss_value,
+            adam_loss_value=adam_loss_value,
+            lbfgs_loss_value=lbfgs_loss_value,
+        )
+
+    def _sample_training_points(self, step: int, rad_on_first: bool = False):
+        points = self.sampler.sample()
+        if not self.train_cfg.rad.use:
+            return points
+        if step == 0 and not rad_on_first:
+            return points
+
+        rad_points_raw = self.rad_sampler.sample()
+        res_dict = self.pde.residual(self.model, rad_points_raw)
+        res_domain = res_dict["domain"]
+
+        n_rad = int(self.train_cfg.rad.ratio * self.train_cfg.batch_size.domain)
+        n_rad = min(max(n_rad, 1), points["domain"].shape[0])
+        rad_selected = self.sampler.rad_sampler(
+            res_domain,
+            rad_points_raw["domain"],
+            n_rad,
+        ).detach()
+
+        current_domain = points["domain"]
+        n_keep = current_domain.shape[0] - n_rad
+        if n_keep > 0:
+            keep_idx = torch.randperm(current_domain.shape[0], device=self.device)[:n_keep]
+            points["domain"] = torch.cat([current_domain[keep_idx], rad_selected], dim=0)
+        else:
+            points["domain"] = rad_selected
+        return points
+
+    def _loss_closure(self, points, optimizer=None, backward=True):
+        if optimizer is not None:
+            optimizer.zero_grad(set_to_none=True)
+
+        residuals = self.pde.residual(self.model, points)
+        weights = self.cfg.pde.weights
+        loss = torch.zeros((), device=self.device)
+        log_dict = {}
+
+        for key, value in residuals.items():
+            term = torch.mean(torch.square(value))
+            loss = loss + float(_cfg_get(weights, key, 1.0)) * term
+            log_dict[f"loss_{key}"] = float(term.detach().cpu().item())
+
+        log_dict["loss_total"] = float(loss.detach().cpu().item())
+
+        if backward:
+            loss.backward()
+        return loss, log_dict
+
+    def _adam_step(self, points):
+        loss, log_dict = self._loss_closure(
+            points,
+            optimizer=self.optimizer,
+            backward=True,
+        )
+        self.optimizer.step()
+        return float(loss.detach().cpu().item()), log_dict
+
+    def _build_lbfgs_optimizer(self):
+        lbfgs_cfg = self.cfg.optimizer.lbfgs
+        return optim.LBFGS(
+            self.model.parameters(),
+            lr=float(lbfgs_cfg.lr),
+            max_iter=int(lbfgs_cfg.max_iter),
+            max_eval=int(lbfgs_cfg.max_eval) if _cfg_get(lbfgs_cfg, "max_eval") is not None else None,
+            history_size=int(lbfgs_cfg.history_size),
+        )
+
+    def _lbfgs_step(self, points):
+        if self.lbfgs_optimizer is None:
+            self.lbfgs_optimizer = self._build_lbfgs_optimizer()
+
+        def closure():
+            loss, _ = self._loss_closure(
+                points,
+                optimizer=self.lbfgs_optimizer,
+                backward=True,
+            )
+            return loss
+
+        self.lbfgs_optimizer.step(closure)
+        loss, log_dict = self._loss_closure(points, optimizer=None, backward=False)
+        self.lbfgs_optimizer.zero_grad(set_to_none=True)
+        return float(loss.detach().cpu().item()), log_dict
+
+    def _log_loss_event(self, phase: str, loss_value: float, global_step: int, epoch: int):
+        self.loss_event += 1
+        payload = {
+            "train/loss_event": self.loss_event,
+            "train/loss_continuous": loss_value,
+            "train/adam_step": global_step,
+            "train/epoch": epoch,
+            "train/phase_id": 0 if phase == "adam" else 1,
+            "train/phase": phase,
+        }
+        if phase == "adam":
+            payload["train/adam_loss"] = loss_value
+        else:
+            payload["train/lbfgs_loss"] = loss_value
+        wandb.log(payload)
+
+    def _steps_per_epoch(self):
+        timing_cfg = getattr(self.train_cfg, "timing", None)
+        return int(
+            _cfg_get(
+                self.train_cfg,
+                "steps_per_epoch",
+                _cfg_get(timing_cfg, "epoch_steps", self.train_cfg.max_steps),
+            )
+        )
+
+    def _log_train_terms(self, log_dict, step):
+        payload = dict(log_dict)
+        payload["train/adam_step"] = step
+        wandb.log(payload, step=step)
         
     def train(self):
-        max_steps = self.train_cfg.max_steps
+        if self.use_hybrid_lbfgs:
+            self._train_hybrid()
+        else:
+            self._train_adam_only()
+
+    def _train_adam_only(self):
+        max_steps = int(self.train_cfg.max_steps)
         pbar = tqdm(range(max_steps), desc="Training")
         self.timing_start = time.perf_counter()
         self.timing_epoch_start = self.timing_start
         
         for step in pbar:
-            # 1. Sample
-            points = self.sampler.sample()
-            
-            # 2. RAD Sampling Logic
-            if self.train_cfg.rad.use and step > 0: # Maybe not every step? Original: every step.
-                # Original logic:
-                # node_rad = rad_sampler.sample()
-                # residuals = pde.residual(net, node_rad)
-                # rad_points = sampler.rad_sampler(residuals['in'], node_rad['in'], ...)
-                # ... replace some points['in'] with rad_points
-                
-                # We'll implement a simplified version or full version
-                rad_points_raw = self.rad_sampler.sample()
-                
-                # We need residual magnitude
-                # Re-use pde residual calculation but we only need 'domain'
-                # But pde.residual calculates all.
-                # We can optimize pde to separate domain residual.
-                # For now, call full residual
-                res_dict = self.pde.residual(self.model, rad_points_raw)
-                res_domain = res_dict['domain'] # Tensor
-                
-                n_rad = int(self.train_cfg.rad.ratio * self.train_cfg.batch_size.domain)
-                rad_selected = self.sampler.rad_sampler(res_domain, rad_points_raw['domain'], n_rad)
-                rad_selected = rad_selected.detach() # Detach to ensure leaf
-                
-                # Replace in current batch
-                # points['domain'] is N x D
-                # We replace last n_rad points or random?
-                # Original: ind = np.random.choice...
-                current_domain = points['domain']
-                n_keep = current_domain.shape[0] - n_rad
-                if n_keep > 0:
-                    keep_idx = torch.randperm(current_domain.shape[0])[:n_keep]
-                    points['domain'] = torch.cat([current_domain[keep_idx], rad_selected], dim=0)
-                else:
-                    points['domain'] = rad_selected
-
-            # 3. Optimization Step
-            def closure():
-                self.optimizer.zero_grad()
-                residuals = self.pde.residual(self.model, points)
-                loss = 0
-                log_dict = {}
-                
-                weights = self.cfg.pde.weights
-                
-                # Weighted sum
-                if 'domain' in residuals:
-                    l = torch.mean(torch.square(residuals['domain']))
-                    loss += weights.domain * l
-                    log_dict['loss_domain'] = l.item()
-                    
-                if 'boundary' in residuals:
-                    l = torch.mean(torch.square(residuals['boundary']))
-                    loss += weights.boundary * l
-                    log_dict['loss_boundary'] = l.item()
-                    
-                if 'initial' in residuals:
-                    l = torch.mean(torch.square(residuals['initial']))
-                    loss += weights.initial * l
-                    log_dict['loss_initial'] = l.item()
-                    
-                if 'initial_dt' in residuals:
-                    l = torch.mean(torch.square(residuals['initial_dt']))
-                    loss += weights.initial_dt * l
-                    log_dict['loss_initial_dt'] = l.item()
-                
-                log_dict['loss_total'] = loss.item()
-                
-                loss.backward()
-                
-                # WandB logging inside closure? Usually outside.
-                # But LBFGS calls closure multiple times.
-                # We'll return loss and log outside or keep simple.
-                # For Adam, closure is called once.
-                return loss, log_dict
-
-            loss, log_dict = closure()
-            self.optimizer.step()
-            self._record_timing(step + 1, log_dict['loss_total'])
+            points = self._sample_training_points(step, rad_on_first=False)
+            _, log_dict = self._adam_step(points)
+            self._record_timing(step + 1, log_dict["loss_total"])
             
             # Logging
             if step % 100 == 0:
-                wandb.log(log_dict, step=step)
-                pbar.set_postfix({'loss': log_dict['loss_total']})
+                self._log_train_terms(log_dict, step)
+                pbar.set_postfix({"loss": log_dict["loss_total"]})
             
             # Evaluation & Plotting
             if step % 1000 == 0 or step == max_steps - 1:
                 self.evaluate(step)
                 self.save_checkpoint(step)
 
-        # LBFGS Phase
-        if self.cfg.optimizer.lbfgs.use:
-            log.info("Starting LBFGS...")
-            self.lbfgs_optimizer = optim.LBFGS(
-                self.model.parameters(),
-                lr=self.cfg.optimizer.lbfgs.lr,
-                max_iter=self.cfg.optimizer.lbfgs.max_iter,
-                history_size=self.cfg.optimizer.lbfgs.history_size
+    def _train_hybrid(self):
+        max_steps = int(self.train_cfg.max_steps)
+        steps_per_epoch = self._steps_per_epoch()
+        if steps_per_epoch <= 0:
+            raise ValueError("trainer.steps_per_epoch must be positive")
+        epochs = max_steps // steps_per_epoch
+        if epochs <= 0:
+            raise ValueError("trainer.max_steps must be >= trainer.steps_per_epoch")
+        if max_steps % steps_per_epoch != 0:
+            ignored = max_steps - epochs * steps_per_epoch
+            log.info("Ignoring %s trailing step(s) after epoch division", ignored)
+
+        self.timing_epoch_steps = steps_per_epoch
+        self.timing_start = time.perf_counter()
+        self.timing_epoch_start = self.timing_start
+        pbar = tqdm(range(epochs), desc="Hybrid epochs")
+        global_step = 0
+
+        for epoch in pbar:
+            points = self._sample_training_points(global_step, rad_on_first=True)
+            adam_loss = None
+            adam_log = None
+            adam_start = time.perf_counter()
+            for _ in range(steps_per_epoch):
+                adam_loss, adam_log = self._adam_step(points)
+                global_step += 1
+
+            if self.device.type == "cuda":
+                torch.cuda.synchronize(self.device)
+            adam_elapsed = time.perf_counter() - adam_start
+
+            lbfgs_loss, lbfgs_log = self._lbfgs_step(points)
+            self._record_timing_elapsed(
+                global_step,
+                adam_elapsed,
+                lbfgs_loss,
+                adam_loss_value=adam_loss,
+                lbfgs_loss_value=lbfgs_loss,
             )
-            
-            # Resample for LBFGS? Or use fixed batch?
-            # Usually fixed batch for LBFGS steps or resampling?
-            # Original code re-samples or uses closure logic.
-            # Original: loop over epochs, call step(closure).
-            
-            for i in range(self.cfg.optimizer.lbfgs.epochs):
-                points = self.sampler.sample() # Resample per epoch
-                def lbfgs_closure():
-                    self.lbfgs_optimizer.zero_grad()
-                    residuals = self.pde.residual(self.model, points)
-                    loss = 0
-                    weights = self.cfg.pde.weights
-                    for key, val in residuals.items():
-                        loss += weights.get(key, 1.0) * torch.mean(torch.square(val))
-                    loss.backward()
-                    return loss
-                
-                self.lbfgs_optimizer.step(lbfgs_closure)
-                
-                # Eval after LBFGS epoch
-                self.evaluate(max_steps + i + 1)
+            self._log_loss_event("adam", adam_loss, global_step, epoch + 1)
+            self._log_loss_event("lbfgs", lbfgs_loss, global_step, epoch + 1)
+
+            log_payload = dict(lbfgs_log)
+            log_payload["train/adam_step"] = global_step
+            log_payload["train/epoch"] = epoch + 1
+            wandb.log(log_payload)
+
+            pbar.set_postfix({"adam": adam_loss, "lbfgs": lbfgs_loss})
+            if global_step % 1000 == 0 or epoch == epochs - 1:
+                self.evaluate(global_step)
+                self.save_checkpoint(global_step)
 
     def evaluate(self, step):
         if getattr(self.pde, "spatial_dim", 1) == 2:
