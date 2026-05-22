@@ -109,6 +109,7 @@ class EpochTimer:
         self.start_time = None
         self.epoch_start_time = None
         self.epoch_times = []
+        self.external_elapsed = False
 
         if self.enabled and self.epoch_steps <= 0:
             raise ValueError("timing epoch_steps must be positive")
@@ -143,6 +144,8 @@ class EpochTimer:
                     "total_seconds",
                     "average_epoch_seconds",
                     "loss",
+                    "adam_loss",
+                    "lbfgs_loss",
                 ],
             )
             writer.writeheader()
@@ -151,18 +154,24 @@ class EpochTimer:
             f"writing {self.path}"
         )
 
-    def maybe_record(self, step, loss_val):
-        if not self.enabled or step % self.epoch_steps != 0:
-            return None
-
-        jax.block_until_ready(loss_val)
-        now = time.perf_counter()
-        elapsed = now - self.epoch_start_time
-        total = now - self.start_time
+    def _write_record(self, step, elapsed, total, loss_val,
+                      adam_loss_val=None, lbfgs_loss_val=None):
         self.epoch_times.append(elapsed)
         avg = float(np.mean(self.epoch_times))
-        loss = float(jnp.mean(loss_val))
         epoch = len(self.epoch_times)
+
+        loss_source = lbfgs_loss_val if lbfgs_loss_val is not None else loss_val
+        loss = float(jnp.mean(loss_source))
+        adam_loss = (
+            float(jnp.mean(adam_loss_val))
+            if adam_loss_val is not None
+            else ""
+        )
+        lbfgs_loss = (
+            float(jnp.mean(lbfgs_loss_val))
+            if lbfgs_loss_val is not None
+            else ""
+        )
 
         row = {
             "epoch": epoch,
@@ -172,27 +181,72 @@ class EpochTimer:
             "total_seconds": f"{total:.8f}",
             "average_epoch_seconds": f"{avg:.8f}",
             "loss": f"{loss:.8e}",
+            "adam_loss": f"{adam_loss:.8e}" if adam_loss != "" else "",
+            "lbfgs_loss": f"{lbfgs_loss:.8e}" if lbfgs_loss != "" else "",
         }
         with open(self.path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row.keys()))
             writer.writerow(row)
 
-        self.epoch_start_time = now
         print(
             f"  Timing epoch {epoch:>3d} | step {step:>7d} | "
             f"elapsed {_format_seconds(elapsed)} | "
             f"avg {_format_seconds(avg)}"
         )
-        return {
+
+        log = {
             "timing/epoch": epoch,
             "timing/elapsed_seconds": elapsed,
             "timing/average_epoch_seconds": avg,
+            "timing/loss": loss,
         }
+        if adam_loss != "":
+            log["timing/adam_loss"] = adam_loss
+        if lbfgs_loss != "":
+            log["timing/lbfgs_loss"] = lbfgs_loss
+        return log
+
+    def maybe_record(self, step, loss_val):
+        if not self.enabled or step % self.epoch_steps != 0:
+            return None
+
+        jax.block_until_ready(loss_val)
+        now = time.perf_counter()
+        elapsed = now - self.epoch_start_time
+        total = now - self.start_time
+        self.epoch_start_time = now
+        return self._write_record(step, elapsed, total, loss_val)
+
+    def record_elapsed(self, step, elapsed, loss_val, adam_loss_val=None,
+                       lbfgs_loss_val=None):
+        if not self.enabled:
+            return None
+
+        self.external_elapsed = True
+        jax.block_until_ready(loss_val)
+        if adam_loss_val is not None:
+            jax.block_until_ready(adam_loss_val)
+        if lbfgs_loss_val is not None:
+            jax.block_until_ready(lbfgs_loss_val)
+
+        elapsed = float(elapsed)
+        total = float(np.sum(self.epoch_times) + elapsed)
+        return self._write_record(
+            step,
+            elapsed,
+            total,
+            loss_val,
+            adam_loss_val=adam_loss_val,
+            lbfgs_loss_val=lbfgs_loss_val,
+        )
 
     def finish(self, max_steps):
         if not self.enabled:
             return
-        total = time.perf_counter() - self.start_time
+        if self.external_elapsed:
+            total = float(np.sum(self.epoch_times))
+        else:
+            total = time.perf_counter() - self.start_time
         if self.epoch_times:
             avg = float(np.mean(self.epoch_times))
             print(

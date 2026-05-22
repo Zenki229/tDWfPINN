@@ -297,19 +297,55 @@ class PINN:
         mean_n = jnp.mean(jnp.array(list(norms.values())))
         return {k: mean_n / norms[k] for k in norms}
 
+    def _optimizer_closure(self, state, batch, key):
+        key, subkey = jax.random.split(key)
+
+        def value_fn(p):
+            loss_val, _ = self.loss(p, state.weights, state.apply_fn, batch, subkey)
+            return jax.lax.pmean(loss_val, axis_name='batch')
+
+        def value_with_aux(p):
+            return self.loss(p, state.weights, state.apply_fn, batch, subkey)
+
+        (loss_val, aux), grads = jax.value_and_grad(
+            value_with_aux, has_aux=True
+        )(state.params)
+
+        grads = jax.lax.pmean(grads, axis_name='batch')
+        loss_val = jax.lax.pmean(loss_val, axis_name='batch')
+        return loss_val, aux, grads, value_fn, key
+
+    def _apply_lbfgs_gradients(self, state, grads, loss_val, value_fn):
+        updates, new_opt_state = state.tx.update(
+            grads,
+            state.opt_state,
+            state.params,
+            value=loss_val,
+            grad=grads,
+            value_fn=value_fn,
+        )
+        new_params = optax.apply_updates(state.params, updates)
+        return state.replace(
+            step=state.step + 1,
+            params=new_params,
+            opt_state=new_opt_state,
+        )
+
     # pmap-wrapped training ops
 
     @partial(jax.pmap, axis_name='batch', static_broadcasted_argnums=(0,))
     def step(self, state, batch, key):
-        key, subkey = jax.random.split(key)
-
-        def fn(p):
-            return self.loss(p, state.weights, state.apply_fn, batch, subkey)
-        (loss_val, aux), grads = jax.value_and_grad(fn, has_aux=True)(state.params)
-
-        grads = jax.lax.pmean(grads, axis_name='batch')
-        loss_val = jax.lax.pmean(loss_val, axis_name='batch')
+        loss_val, aux, grads, _, key = self._optimizer_closure(state, batch, key)
         return state.apply_gradients(grads=grads), loss_val, aux, key
+
+    @partial(jax.pmap, axis_name='batch', static_broadcasted_argnums=(0, 4))
+    def lbfgs_step(self, state, batch, key, max_iter):
+        for _ in range(max_iter):
+            loss_val, aux, grads, value_fn, key = self._optimizer_closure(
+                state, batch, key
+            )
+            state = self._apply_lbfgs_gradients(state, grads, loss_val, value_fn)
+        return state, loss_val, aux, key
 
     @partial(jax.pmap, axis_name='batch', static_broadcasted_argnums=(0,))
     def update_weights(self, state, batch, key):

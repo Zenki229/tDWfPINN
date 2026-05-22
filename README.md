@@ -233,15 +233,18 @@ python jax_irregular.py pde=lshape training.max_steps=50000 training.batch.in=20
 ```
 
 Two-dimensional irregular cases can also be launched with residual-adaptive
-interior sampling and Optax L-BFGS:
+interior sampling and the Adam + L-BFGS hybrid schedule:
 
 ```bash
-python jax_irregular.py pde=irregular_hole training.optimizer=lbfgs training.lbfgs.lr=0.01 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
-python jax_irregular.py pde=lshape training.optimizer=lbfgs training.lbfgs.lr=0.01 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
+python jax_irregular.py pde=irregular_hole training.optimizer=lbfgs training.max_steps=10000 training.steps_per_epoch=5000 training.lbfgs.lr=0.01 training.lbfgs.max_iter=10 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
+python jax_irregular.py pde=lshape training.optimizer=lbfgs training.max_steps=10000 training.steps_per_epoch=5000 training.lbfgs.lr=0.01 training.lbfgs.max_iter=10 pde.RAD.use=true pde.RAD.ratio=0.3 pde.RAD.batch.in=20000
 ```
 
-The current L-BFGS path disables Optax line search so it can run through the
-same stochastic pmapped training step as Adam.
+For this path, `epochs = training.max_steps // training.steps_per_epoch`. Each
+epoch samples one batch (including RAD when enabled), runs Adam for
+`training.steps_per_epoch` updates on that batch, then runs one L-BFGS phase for
+`training.lbfgs.max_iter` iterations using the same loss closure. Timing records
+only the Adam phase; both Adam and L-BFGS losses are logged.
 
 Each training run is saved under a timestamped Hydra directory:
 
@@ -332,13 +335,14 @@ contains 5000 Adam updates.
 The timing CSV is written to the current run directory as `timing.csv`:
 
 ```text
-epoch, step, epoch_steps, elapsed_seconds, total_seconds, average_epoch_seconds, loss
+epoch, step, epoch_steps, elapsed_seconds, total_seconds, average_epoch_seconds, loss, adam_loss, lbfgs_loss
 ```
 
 Configure timing in [`conf/training/default.yaml`](conf/training/default.yaml):
 
 ```yaml
 training:
+  steps_per_epoch: 5000
   timing:
     enabled: true
     epoch_steps: 5000

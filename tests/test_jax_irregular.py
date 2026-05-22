@@ -126,11 +126,39 @@ def test_lbfgs_train_state_can_start_for_irregular_model():
     key = jax.random.PRNGKey(7)
     optim_cfg = OmegaConf.create({
         "optimizer": "lbfgs",
-        "lbfgs": {"use": True, "lr": 1e-2, "history_size": 3},
+        "lbfgs": {"use": True, "lr": 1e-2, "history_size": 3, "max_iter": 2},
     })
     state = create_train_state(key, _model_cfg(), optim_cfg, _weighting_cfg())
 
     assert state.opt_state is not None
+
+
+def test_irregular_lbfgs_step_runs_inner_iterations_single_cpu():
+    n_devices = jax.local_device_count()
+    key = jax.random.PRNGKey(8)
+    optim_cfg = OmegaConf.create({
+        "optimizer": "lbfgs",
+        "lbfgs": {"use": True, "lr": 1e-2, "history_size": 3},
+    })
+    state = replicate(create_train_state(key, _model_cfg(), optim_cfg, _weighting_cfg()))
+    pde = JAXIrregularHoleDW(_hole_cfg("GJ-II"), _weighting_cfg())
+    sampler = IrregularHoleSampler(
+        [0, 1],
+        {"in": 4 * n_devices, "bd": 2 * n_devices, "init": 2 * n_devices},
+        center=(-0.3, 0.2),
+        r0=0.25,
+        n_devices=n_devices,
+        shard=True,
+    )
+    batch = next(iter(sampler))
+    keys = jax.random.split(key, n_devices)
+
+    state, loss_val, aux, keys = pde.lbfgs_step(state, batch, keys, 2)
+
+    assert loss_val.shape == (n_devices,)
+    assert jnp.all(jnp.isfinite(loss_val))
+    assert state.step.shape == (n_devices,)
+    assert jnp.all(state.step == 2)
 
 
 def test_irregular_hole_exact_initial_and_boundary_values():
