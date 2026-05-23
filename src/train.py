@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.utils.experiments import set_seed, setup_wandb
+from src.physics.burgers import TimeFracBurgers1D
 from src.physics.dw_pde import DWForward
 from src.physics.irregular_2d import IrregularHole2D, LShape2D
 from src.data.sampler import IrregularHoleSampler, LShapeSampler, TimeSpaceSampler
@@ -32,6 +33,7 @@ log = logging.getLogger(__name__)
 PDE_REGISTRY = {
     "dw_forward": DWForward,
     "forward": DWForward,
+    "burgers": TimeFracBurgers1D,
     "irregular_hole": IrregularHole2D,
     "lshape": LShape2D,
 }
@@ -97,6 +99,13 @@ class Trainer:
         else:
             self.plotter = PlotlyPlotter(os.getcwd(), cfg)
         self._setup_timing()
+        self.loss_log_every_steps = int(
+            _cfg_get(self.train_cfg, "loss_log_every_steps", 100)
+        )
+        self.eval_every_steps = int(
+            _cfg_get(self.train_cfg, "eval_every_steps", self.timing_epoch_steps)
+        )
+        self.eval_every_epochs = int(_cfg_get(self.train_cfg, "eval_every_epochs", 1))
 
     def _build_pde(self):
         pde_name = str(getattr(self.cfg.pde, "name", "dw_forward"))
@@ -332,6 +341,7 @@ class Trainer:
             payload["train/adam_loss"] = loss_value
         else:
             payload["train/lbfgs_loss"] = loss_value
+            payload["train/lbfgs_max_iter"] = int(self.cfg.optimizer.lbfgs.max_iter)
         wandb.log(payload)
 
     def _steps_per_epoch(self):
@@ -347,7 +357,26 @@ class Trainer:
     def _log_train_terms(self, log_dict, step):
         payload = dict(log_dict)
         payload["train/adam_step"] = step
-        wandb.log(payload, step=step)
+        wandb.log(payload)
+
+    def _should_log_loss(self, step: int, max_steps: int) -> bool:
+        if self.loss_log_every_steps <= 0:
+            return False
+        return (
+            step == 1
+            or step == max_steps
+            or step % self.loss_log_every_steps == 0
+        )
+
+    def _should_evaluate_step(self, step: int, max_steps: int) -> bool:
+        if self.eval_every_steps <= 0:
+            return step == max_steps
+        return step == max_steps or step % self.eval_every_steps == 0
+
+    def _should_evaluate_epoch(self, epoch: int, epochs: int) -> bool:
+        if self.eval_every_epochs <= 0:
+            return epoch == epochs
+        return epoch == epochs or epoch % self.eval_every_epochs == 0
         
     def train(self):
         if self.use_hybrid_lbfgs:
@@ -361,18 +390,17 @@ class Trainer:
         self.timing_start = time.perf_counter()
         self.timing_epoch_start = self.timing_start
         
-        for step in pbar:
-            points = self._sample_training_points(step, rad_on_first=False)
+        for step_idx in pbar:
+            step = step_idx + 1
+            points = self._sample_training_points(step_idx, rad_on_first=False)
             _, log_dict = self._adam_step(points)
-            self._record_timing(step + 1, log_dict["loss_total"])
+            self._record_timing(step, log_dict["loss_total"])
             
-            # Logging
-            if step % 100 == 0:
+            if self._should_log_loss(step, max_steps):
                 self._log_train_terms(log_dict, step)
                 pbar.set_postfix({"loss": log_dict["loss_total"]})
             
-            # Evaluation & Plotting
-            if step % 1000 == 0 or step == max_steps - 1:
+            if self._should_evaluate_step(step, max_steps):
                 self.evaluate(step)
                 self.save_checkpoint(step)
 
@@ -391,10 +419,12 @@ class Trainer:
         self.timing_epoch_steps = steps_per_epoch
         self.timing_start = time.perf_counter()
         self.timing_epoch_start = self.timing_start
-        pbar = tqdm(range(epochs), desc="Hybrid epochs")
+        effective_steps = epochs * steps_per_epoch
+        pbar = tqdm(total=effective_steps, desc="Hybrid Adam steps")
         global_step = 0
 
-        for epoch in pbar:
+        for epoch_idx in range(epochs):
+            epoch = epoch_idx + 1
             points = self._sample_training_points(global_step, rad_on_first=True)
             adam_loss = None
             adam_log = None
@@ -402,11 +432,25 @@ class Trainer:
             for _ in range(steps_per_epoch):
                 adam_loss, adam_log = self._adam_step(points)
                 global_step += 1
+                pbar.update(1)
+                if self._should_log_loss(global_step, effective_steps):
+                    self._log_train_terms(adam_log, global_step)
+                    self._log_loss_event("adam", adam_loss, global_step, epoch)
+                    pbar.set_postfix({
+                        "phase": "adam",
+                        "step": global_step,
+                        "loss": adam_loss,
+                    })
 
             if self.device.type == "cuda":
                 torch.cuda.synchronize(self.device)
             adam_elapsed = time.perf_counter() - adam_start
 
+            pbar.set_postfix({
+                "phase": "lbfgs",
+                "step": global_step,
+                "adam": adam_loss,
+            })
             lbfgs_loss, lbfgs_log = self._lbfgs_step(points)
             self._record_timing_elapsed(
                 global_step,
@@ -415,18 +459,24 @@ class Trainer:
                 adam_loss_value=adam_loss,
                 lbfgs_loss_value=lbfgs_loss,
             )
-            self._log_loss_event("adam", adam_loss, global_step, epoch + 1)
-            self._log_loss_event("lbfgs", lbfgs_loss, global_step, epoch + 1)
+            self._log_loss_event("lbfgs", lbfgs_loss, global_step, epoch)
 
             log_payload = dict(lbfgs_log)
             log_payload["train/adam_step"] = global_step
-            log_payload["train/epoch"] = epoch + 1
+            log_payload["train/epoch"] = epoch
+            log_payload["train/lbfgs_max_iter"] = int(self.cfg.optimizer.lbfgs.max_iter)
             wandb.log(log_payload)
 
-            pbar.set_postfix({"adam": adam_loss, "lbfgs": lbfgs_loss})
-            if global_step % 1000 == 0 or epoch == epochs - 1:
+            pbar.set_postfix({
+                "phase": "lbfgs_done",
+                "step": global_step,
+                "adam": adam_loss,
+                "lbfgs": lbfgs_loss,
+            })
+            if self._should_evaluate_epoch(epoch, epochs):
                 self.evaluate(global_step)
                 self.save_checkpoint(global_step)
+        pbar.close()
 
     def evaluate(self, step):
         if getattr(self.pde, "spatial_dim", 1) == 2:
@@ -455,7 +505,11 @@ class Trainer:
             
             # Log error metrics
             l2_error = np.linalg.norm(u_pred - u_exact) / np.linalg.norm(u_exact)
-            wandb.log({"L2_Relative_Error": l2_error}, step=step)
+            wandb.log({
+                "train/adam_step": step,
+                "eval/relative_error": l2_error,
+                "L2_Relative_Error": l2_error,
+            })
             log.info(f"Step {step}: L2 Error = {l2_error:.2e}")
 
     def _predict_numpy(self, points_np: np.ndarray, chunk_size: int = 4096) -> np.ndarray:
@@ -535,7 +589,11 @@ class Trainer:
             )
         if rel_errors:
             mean_rel = float(np.nanmean(rel_errors))
-            wandb.log({"L2_Relative_Error": mean_rel}, step=step)
+            wandb.log({
+                "train/adam_step": step,
+                "eval/relative_error": mean_rel,
+                "L2_Relative_Error": mean_rel,
+            })
             log.info(f"Step {step}: 2D mean L2 Error = {mean_rel:.2e}")
 
     def save_checkpoint(self, step):

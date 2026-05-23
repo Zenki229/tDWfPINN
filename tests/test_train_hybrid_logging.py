@@ -12,6 +12,7 @@ def test_hybrid_loss_event_wandb_payload(monkeypatch):
 
     trainer = Trainer.__new__(Trainer)
     trainer.loss_event = 0
+    trainer.cfg = OmegaConf.create({"optimizer": {"lbfgs": {"max_iter": 3}}})
 
     Trainer._log_loss_event(trainer, "adam", 1.25, global_step=10, epoch=1)
     Trainer._log_loss_event(trainer, "lbfgs", 0.75, global_step=10, epoch=1)
@@ -23,7 +24,27 @@ def test_hybrid_loss_event_wandb_payload(monkeypatch):
     assert calls[1][0]["train/loss_event"] == 2
     assert calls[1][0]["train/loss_continuous"] == 0.75
     assert calls[1][0]["train/lbfgs_loss"] == 0.75
+    assert calls[1][0]["train/lbfgs_max_iter"] == 3
     assert calls[1][0]["train/phase"] == "lbfgs"
+
+
+def test_loss_and_eval_schedule_helpers():
+    trainer = Trainer.__new__(Trainer)
+    trainer.loss_log_every_steps = 100
+    trainer.eval_every_steps = 5000
+    trainer.eval_every_epochs = 1
+
+    assert Trainer._should_log_loss(trainer, 1, 1000)
+    assert Trainer._should_log_loss(trainer, 100, 1000)
+    assert Trainer._should_log_loss(trainer, 1000, 1000)
+    assert not Trainer._should_log_loss(trainer, 99, 1000)
+
+    assert Trainer._should_evaluate_step(trainer, 5000, 10000)
+    assert Trainer._should_evaluate_step(trainer, 10000, 10000)
+    assert not Trainer._should_evaluate_step(trainer, 100, 10000)
+
+    assert Trainer._should_evaluate_epoch(trainer, 1, 3)
+    assert Trainer._should_evaluate_epoch(trainer, 3, 3)
 
 
 def test_timing_record_writes_adam_and_lbfgs_losses(tmp_path, monkeypatch):
@@ -96,5 +117,13 @@ def test_setup_wandb_defines_hybrid_metrics(tmp_path, monkeypatch):
     ) in defined
     assert (
         ("timing/*",),
+        {"step_metric": "train/adam_step"},
+    ) in defined
+    assert (
+        ("loss_*",),
+        {"step_metric": "train/adam_step"},
+    ) in defined
+    assert (
+        ("eval/*",),
         {"step_metric": "train/adam_step"},
     ) in defined

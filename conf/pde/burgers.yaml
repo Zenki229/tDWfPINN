@@ -1,0 +1,26 @@
+_target_: src.physics.burgers.TimeFracBurgers1D
+name: burgers
+input_dim: 2
+
+# Time-fractional Burgers benchmark.
+alpha: 1.5
+beta: 2.0
+nu: 0.0031830988618379066  # 0.01 / pi
+x_lim: [-1, 1]
+t_lim: [0, 1.2]
+method: "GJ-II"
+datafile: data/burgers_150.npz
+
+monte_carlo_params:
+  nums: 50
+  eps: 1e-10
+gauss_jacobi_params:
+  nums: 50
+gj_params:
+  nums: 50
+
+weights:
+  domain: 1.0
+  boundary: 1.0
+  initial: 1.0
+  initial_dt: 1.0

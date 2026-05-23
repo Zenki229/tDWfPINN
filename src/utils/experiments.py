@@ -46,6 +46,9 @@ def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> wandb.run:
     wandb.define_metric("train/adam_loss", step_metric="train/loss_event")
     wandb.define_metric("train/lbfgs_loss", step_metric="train/loss_event")
     wandb.define_metric("train/adam_step")
+    wandb.define_metric("loss_*", step_metric="train/adam_step")
+    wandb.define_metric("eval/*", step_metric="train/adam_step")
+    wandb.define_metric("L2_Relative_Error", step_metric="train/adam_step")
     wandb.define_metric("timing/*", step_metric="train/adam_step")
     log.info(f"WandB initialized for project {cfg.wandb.project}")
     return run 

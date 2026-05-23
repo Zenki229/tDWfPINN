@@ -82,7 +82,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         num_points = len(points)
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-        taus: torch.Tensor = torch.from_numpy(taus).to(self.device)
+        taus: torch.Tensor = torch.from_numpy(taus).to(device=self.device, dtype=points.dtype)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
         t0.requires_grad = True
         val0 = self.u_net(net, t0)
@@ -98,7 +98,10 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         taus = taus.unsqueeze(-1)
         t_tau = t.T * taus
         t_minus_t_tau = points[:, 0] - t_tau
-        t_tau_clip = torch.maximum(t_tau, torch.tensor(monte_carlo_eps).to(self.device))
+        t_tau_clip = torch.maximum(
+            t_tau,
+            torch.tensor(monte_carlo_eps, device=self.device, dtype=points.dtype),
+        )
         x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
         new_points = torch.stack((t_minus_t_tau, x), dim=2)
         new_points.detach()
@@ -125,7 +128,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         num_points = len(points)
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-        taus: torch.Tensor = torch.from_numpy(taus).to(self.device)
+        taus: torch.Tensor = torch.from_numpy(taus).to(device=self.device, dtype=points.dtype)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
         t0.requires_grad = True
         val0 = self.u_net(net, t0)
@@ -141,7 +144,10 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         taus = taus.unsqueeze(-1)
         t_tau = t.T * taus
         t_minus_t_tau = points[:, 0] - t_tau
-        t_tau_clip = torch.maximum(t_tau, torch.tensor(monte_carlo_eps).to(self.device))
+        t_tau_clip = torch.maximum(
+            t_tau,
+            torch.tensor(monte_carlo_eps, device=self.device, dtype=points.dtype),
+        )
         x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
         new_points = torch.stack((t_minus_t_tau, x), dim=2)
         new_points.detach()

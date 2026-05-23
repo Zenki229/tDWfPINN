@@ -16,12 +16,13 @@ Monte Carlo or Gauss-Jacobi quadrature:
 | `GJ-I` | Type-I | Gauss-Jacobi |
 | `GJ-II` | Type-II | Gauss-Jacobi |
 
-The current PyTorch branch includes the one-dimensional forward benchmark plus
-two registered two-dimensional irregular-domain cases:
+The current PyTorch branch includes two one-dimensional benchmarks plus two
+registered two-dimensional irregular-domain cases:
 
 | Case | Config | PDE class | Reference used for plots |
 | --- | --- | --- | --- |
 | 1D forward | `pde=dw_forward` | `src.physics.dw_pde.DWForward` | Analytic Mittag-Leffler solution |
+| 1D Burgers | `pde=burgers` | `src.physics.burgers.TimeFracBurgers1D` | `data/burgers_*.npz` |
 | 2D circular hole | `pde=irregular_hole` | `src.physics.irregular_2d.IrregularHole2D` | Manufactured analytic solution |
 | 2D L-shape | `pde=lshape` | `src.physics.irregular_2d.LShape2D` | `data/lshape/lshape_reference.npz` |
 
@@ -109,6 +110,22 @@ u(t, x) = sin(k pi x)
 ```
 
 The default config is `alpha=1.75`, `k=2`, `lambda=1`, `a=1`, and `b=1`.
+
+### 1D Burgers Problem
+
+The Burgers benchmark solves
+
+```text
+{}^C D_t^alpha u + u u_x - (0.01 / pi) u_xx = 0,
+    (t, x) in (0, 1.2] x (-1, 1),
+
+u(t, -1) = u(t, 1) = 0,
+u(0, x) = -sin(pi x),
+u_t(0, x) = beta sin(pi x).
+```
+
+The default config is `alpha=1.5`, `beta=2`, and `pde.datafile=data/burgers_150.npz`.
+Reference arrays are available for `alpha=1.25`, `1.5`, and `1.75`.
 
 ### 2D Circular-Hole Case
 
@@ -203,38 +220,77 @@ epoch samples one batch, applies RAD when enabled, runs Adam for
 phase using `optimizer.lbfgs.max_iter`. Timing records only the Adam phase, and
 both Adam and L-BFGS losses are logged.
 
-## 2D Method Timing Runs
+Training loss is logged every `trainer.loss_log_every_steps` Adam steps
+(default `100`). Relative error, plotting, and checkpoint storage happen at
+evaluation boundaries: every `trainer.eval_every_steps` in Adam-only runs and
+every `trainer.eval_every_epochs` hybrid epoch by default.
 
-Use the server script to run both irregular-domain cases across Type-I,
-Type-II, MC, and GJ variants:
+## Unified Script Runs
+
+Use the unified PyTorch script for both 1D and 2D cases. Case aliases are
+`1d`, `2d`, and `all`; concrete cases are `dw_forward`, `burgers`,
+`irregular_hole`, and `lshape`.
+
+Run both 2D irregular-domain cases across Type-I, Type-II, MC, and GJ variants:
 
 ```bash
-STEPS=5000 GJ_QUAD=64 MC_QUAD=640 bash scripts/run_pytorch_2d_cases.sh all GJ-I,GJ-II,MC-I,MC-II
+STEPS=5000 GJ_QUAD=64 MC_QUAD=640 bash scripts/run_pytorch_cases.sh 2d GJ-I,GJ-II,MC-I,MC-II
 ```
 
 Run only L-shape with Gauss-Jacobi Type-II:
 
 ```bash
-STEPS=5000 GJ_QUAD=64 bash scripts/run_pytorch_2d_cases.sh lshape GJ-II
+STEPS=5000 GJ_QUAD=64 bash scripts/run_pytorch_cases.sh lshape GJ-II
+```
+
+Run Burgers over the available reference alphas:
+
+```bash
+ALPHAS=1.25,1.5,1.75 STEPS=5000 GJ_QUAD=80 MC_QUAD=80 bash scripts/run_pytorch_cases.sh burgers GJ-I,GJ-II
+```
+
+Run a small RAD-enabled smoke case:
+
+```bash
+RAD_USE=1 RAD_RATIO=0.5 RAD_DOMAIN_BATCH=32 STEPS=5 GJ_QUAD=4 DOMAIN_BATCH=4 BOUNDARY_BATCH=4 INITIAL_BATCH=4 HIDDEN_DIM=8 NUM_LAYERS=1 bash scripts/run_pytorch_cases.sh burgers GJ-II
 ```
 
 Important script parameters:
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
+| `CASES` | Default case selection if positional `$1` is omitted | `2d` |
+| `METHODS` | Default method selection if positional `$2` is omitted | `GJ-I,GJ-II,MC-I,MC-II` |
+| `ALPHAS` | Burgers reference alpha list | `1.25,1.5,1.75` |
+| `FORWARD_ALPHAS` | Optional `dw_forward` alpha sweep | unset |
 | `STEPS` | Adam update steps | `5000` |
 | `STEPS_PER_EPOCH` | Adam updates per hybrid epoch | `5000` |
 | `USE_LBFGS` | Enable hybrid Adam + L-BFGS | `0` |
 | `LBFGS_MAX_ITER` | L-BFGS iterations per hybrid epoch | `10` |
 | `TIMING_EPOCH_STEPS` | Steps per timing row | `5000` |
-| `DOMAIN_BATCH` | Interior collocation batch size | `64` |
-| `BOUNDARY_BATCH` | Boundary batch size | `16` |
-| `INITIAL_BATCH` | Initial-condition batch size | `16` |
-| `GJ_QUAD` | Gauss-Jacobi nodes | `64` |
-| `MC_QUAD` | Monte Carlo samples | `640` |
+| `LOSS_LOG_EVERY` | Adam steps between loss logs | `100` |
+| `EVAL_EVERY_STEPS` | Adam-only evaluation interval | `5000` |
+| `EVAL_EVERY_EPOCHS` | Hybrid evaluation interval | `1` |
+| `DOMAIN_BATCH` | Interior collocation batch size | case default |
+| `BOUNDARY_BATCH` | Boundary batch size | case default |
+| `INITIAL_BATCH` | Initial-condition batch size | case default |
+| `RAD_USE` | Enable residual-adaptive sampling | `0` |
+| `RAD_RATIO` | Fraction of training domain points replaced by RAD | `0.8` |
+| `RAD_DOMAIN_BATCH` | Interior candidate batch for RAD | `1000` |
+| `RAD_BOUNDARY_BATCH` | Boundary candidate batch for RAD | `2` |
+| `RAD_INITIAL_BATCH` | Initial candidate batch for RAD | `2` |
+| `GJ_QUAD` | Gauss-Jacobi nodes | case default |
+| `MC_QUAD` | Monte Carlo samples | case default |
 | `HIDDEN_DIM` | MLP hidden width | `64` |
 | `NUM_LAYERS` | MLP hidden layers | `4` |
+| `PLOT_GRID` | 2D plot grid | `80` |
 | `WANDB_MODE` | W&B mode | `disabled` |
+| `PYTHON` | Python executable | `python` |
+
+The old launchers remain available as compatibility wrappers:
+`scripts/run_pytorch_2d_cases.sh` and `scripts/run_pytorch_burgers.sh`.
+For guided selection, use `scripts/interactive_run.sh`; it calls the unified
+runner and exposes the same RAD controls.
 
 ## Outputs
 
@@ -244,10 +300,12 @@ Hydra creates one timestamped run directory per command. Normal direct runs use
 outputs/YYYY-MM-DD/HH-MM-SS/
 ```
 
-The 2D timing script uses
+The unified timing scripts use case-specific directories:
 
 ```text
 outputs/pytorch_2d/<case>/<method>/<YYYY-MM-DD_HH-MM-SS>/
+outputs/pytorch_burgers/alpha<alpha>/<method>/<YYYY-MM-DD_HH-MM-SS>/
+outputs/pytorch_1d/dw_forward/<method>/<YYYY-MM-DD_HH-MM-SS>/
 ```
 
 Each run directory contains:
@@ -281,8 +339,11 @@ python src/train.py pde=lshape wandb.mode=online wandb.project=tDWfPINN wandb.en
 Set `wandb.mode=offline` on machines without network access but where you still
 want local W&B logs.
 
-Hybrid runs log `train/loss_continuous` against `train/loss_event`, with one
-event after the Adam phase and one event after the L-BFGS phase. The raw phase
+Hybrid runs log `train/loss_continuous` against `train/loss_event`. Adam loss
+events are emitted every `trainer.loss_log_every_steps` Adam updates, and one
+L-BFGS event is emitted at the end of each hybrid epoch. L-BFGS is treated as a
+phase event instead of a fake optimizer-step sequence because PyTorch L-BFGS
+may call its closure fewer or more times than a normal step loop. The raw phase
 metrics are also logged as `train/adam_loss` and `train/lbfgs_loss`, while
 `train/adam_step` preserves the Adam-update axis.
 
