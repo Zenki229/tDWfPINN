@@ -623,7 +623,7 @@ class Trainer:
         self.plotter.plot_2d_scatter_rad(
             kept_xy,
             rad_xy,
-            f"RAD sampling, t={time_value:.3f} (±{dt_tol:.3f})",
+            f"RAD sampling, t={time_value:.3f}",
             f"{self.cfg.pde.name}_{token}_rad_scatter_step_{step}",
             xlim=(float(np.min(x_grid)), float(np.max(x_grid))),
             ylim=(float(np.min(y_grid)), float(np.max(y_grid))),
