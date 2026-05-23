@@ -20,6 +20,30 @@ wandb:
   entity: null
   mode: "disabled" # Default to disabled for dev, user can enable
   group: null
+  name: "${pde.name}-${pde.method}-a${pde.alpha}-${now:%Y%m%d-%H%M%S}"
+  tags:
+    - "${pde.name}"
+    - "${pde.method}"
+    - "alpha-${pde.alpha}"
+  config:
+    pde: "${pde.name}"
+    method: "${pde.method}"
+    alpha: "${pde.alpha}"
+    seed: "${seed}"
+    max_steps: "${trainer.max_steps}"
+    steps_per_epoch: "${trainer.steps_per_epoch}"
+    batch_domain: "${trainer.batch_size.domain}"
+    batch_boundary: "${trainer.batch_size.boundary}"
+    batch_initial: "${trainer.batch_size.initial}"
+    rad_use: "${trainer.rad.use}"
+    rad_ratio: "${trainer.rad.ratio}"
+    gj_nums: "${pde.gj_params.nums}"
+    mc_nums: "${pde.monte_carlo_params.nums}"
+    hidden_dim: "${model.hidden_dim}"
+    num_layers: "${model.num_layers}"
+    lr: "${optimizer.lr}"
+    lbfgs_use: "${optimizer.lbfgs.use}"
+    lbfgs_max_iter: "${optimizer.lbfgs.max_iter}"
 
 seed: 42
 work_dir: ${hydra:runtime.cwd}

@@ -33,11 +33,20 @@ def setup_wandb(cfg: DictConfig, model: torch.nn.Module = None) -> wandb.run:
         cfg (DictConfig): The full Hydra configuration.
         model (torch.nn.Module, optional): Model to watch.
     """
+    name = cfg.wandb.get("name") if hasattr(cfg.wandb, "get") else None
+    tags_cfg = cfg.wandb.get("tags") if hasattr(cfg.wandb, "get") else None
+    if tags_cfg is None:
+        tags = None
+    else:
+        tags = [str(t) for t in OmegaConf.to_container(tags_cfg, resolve=True)]
+
     run = wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
         group=cfg.wandb.group,
         mode=cfg.wandb.mode,
+        name=name,
+        tags=tags,
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
         dir=os.getcwd(),
     )

@@ -289,8 +289,84 @@ Important script parameters:
 
 The old launchers remain available as compatibility wrappers:
 `scripts/run_pytorch_2d_cases.sh` and `scripts/run_pytorch_burgers.sh`.
-For guided selection, use `scripts/interactive_run.sh`; it calls the unified
-runner and exposes the same RAD controls.
+
+### Interactive Selector
+
+For guided parameter entry, run `scripts/interactive_run.sh`. It validates each
+input, exports the same environment variables documented in the table above,
+and then invokes `scripts/run_pytorch_cases.sh` with the chosen cases and
+methods:
+
+```bash
+bash scripts/interactive_run.sh
+```
+
+Interaction conventions:
+
+- Press **Enter** (or type `pass`) at any prompt to accept the displayed default.
+- At single-choice prompts, type either the option number (`1`, `2`, ...) or the option name.
+- At the methods prompt, use a comma list (`1,2` or `GJ-I,MC-II`) or `all`.
+- Press **Ctrl+C** to cancel at any time.
+- At the final confirmation, **Enter** runs immediately, `p` prints a replay shell command, and `q` quits.
+
+The selector walks through four sections. Each row below shows the prompt, the
+environment variable it sets, and the Hydra override that
+`scripts/run_pytorch_cases.sh` ultimately emits.
+
+**1. Target.** Selects the PDE, the optional Burgers alpha list, and the
+quadrature methods. The estimated run count is `(case units) x (number of methods)`,
+where `burgers` contributes one unit per alpha and the other cases contribute one each.
+
+| Prompt | Variable | Effect |
+| --- | --- | --- |
+| Select PDE target | `CASES_ARG` (positional `$1`) | Picks `pde=<case>` (or expands `1d`, `2d`, `all`). |
+| Burgers alpha list | `ALPHAS` | One run per alpha, with `pde.alpha=<a>` and `pde.datafile=data/burgers_<token>.npz`. |
+| Select integration methods | `METHODS_CSV` (positional `$2`) | Sets `pde.method=<m>` for each chosen method. |
+
+**2. Training Schedule.** Adam, L-BFGS hybrid, and logging cadence.
+
+| Prompt | Variable | Hydra override |
+| --- | --- | --- |
+| Adam update steps | `STEPS` | `trainer.max_steps` |
+| Enable Adam + L-BFGS hybrid training? | `USE_LBFGS` | `optimizer.lbfgs.use` |
+| Adam steps per hybrid epoch | `STEPS_PER_EPOCH` | `trainer.steps_per_epoch` |
+| L-BFGS max_iter per hybrid epoch | `LBFGS_MAX_ITER` | `optimizer.lbfgs.max_iter` (only emitted when hybrid is on) |
+| Timing row interval in Adam steps | `TIMING_EPOCH_STEPS` | `trainer.timing.epoch_steps` |
+| Loss logging interval in Adam steps | `LOSS_LOG_EVERY` | `trainer.loss_log_every_steps` (0 disables periodic logs) |
+| Adam-only evaluation interval in steps | `EVAL_EVERY_STEPS` | `trainer.eval_every_steps` (0 keeps only the final evaluation) |
+| Hybrid evaluation interval in epochs | `EVAL_EVERY_EPOCHS` | `trainer.eval_every_epochs` (0 keeps only the final evaluation) |
+
+**3. Sampling and RAD.** Batch sizes and residual-adaptive sampling.
+
+| Prompt | Variable | Hydra override |
+| --- | --- | --- |
+| Interior collocation batch size | `DOMAIN_BATCH` | `trainer.batch_size.domain` |
+| Boundary batch size | `BOUNDARY_BATCH` | `trainer.batch_size.boundary` |
+| Initial-condition batch size | `INITIAL_BATCH` | `trainer.batch_size.initial` |
+| Enable residual-adaptive sampling (RAD)? | `RAD_USE` | `trainer.rad.use` |
+| RAD replacement ratio | `RAD_RATIO` | `trainer.rad.ratio` |
+| RAD interior candidate batch size | `RAD_DOMAIN_BATCH` | `trainer.rad.batch.domain` |
+| RAD boundary candidate batch size | `RAD_BOUNDARY_BATCH` | `trainer.rad.batch.boundary` |
+| RAD initial candidate batch size | `RAD_INITIAL_BATCH` | `trainer.rad.batch.initial` |
+| Gauss-Jacobi quadrature nodes | `GJ_QUAD` | `pde.gj_params.nums` and `pde.gauss_jacobi_params.nums` |
+| Monte Carlo samples | `MC_QUAD` | `pde.monte_carlo_params.nums` |
+
+**4. Model and Output.** Network shape, plotting, and runtime backends.
+
+| Prompt | Variable | Hydra override |
+| --- | --- | --- |
+| MLP hidden width | `HIDDEN_DIM` | `model.hidden_dim` |
+| MLP hidden layers | `NUM_LAYERS` | `model.num_layers` |
+| 2D plot grid | `PLOT_GRID` | `pde.plot_grid` (only for `irregular_hole` and `lshape`) |
+| W&B mode | `WANDB_MODE` | `wandb.mode` (`disabled`, `offline`, `online`) |
+| Python executable | `PYTHON` | Process launched as `${PYTHON} src/train.py ...` |
+
+Case-dependent defaults: when the selected case is `burgers`, the batch and
+quadrature defaults shift to the 1D Burgers regime (`DOMAIN_BATCH=1000`,
+`BOUNDARY_BATCH=100`, `INITIAL_BATCH=100`, `GJ_QUAD=80`, `MC_QUAD=80`);
+otherwise the defaults stay at the 2D regime (`64 / 16 / 16 / 64 / 640`). The
+same case-dependent fallback also applies to non-interactive
+`run_pytorch_cases.sh` invocations through `value_or_case_default`.
 
 ## Outputs
 
