@@ -18,9 +18,9 @@ set -euo pipefail
 #   STEPS, STEPS_PER_EPOCH, USE_LBFGS, LBFGS_MAX_ITER
 #   TIMING_EPOCH_STEPS, LOSS_LOG_EVERY, EVAL_EVERY_STEPS, EVAL_EVERY_EPOCHS
 #   DOMAIN_BATCH, BOUNDARY_BATCH, INITIAL_BATCH
-#   RAD_USE, RAD_RATIO, RAD_DOMAIN_BATCH, RAD_BOUNDARY_BATCH, RAD_INITIAL_BATCH
+#   RAD_USE, RAD_RATIO, RAD_DOMAIN_BATCH   (RAD only resamples interior/domain points)
 #   GJ_QUAD, MC_QUAD, HIDDEN_DIM, NUM_LAYERS, PLOT_GRID
-#   ALPHAS              Burgers reference alphas. Default: 1.25,1.5,1.75.
+#   ALPHAS              Burgers/L-shape reference alphas. Default: 1.25,1.5,1.75.
 #   FORWARD_ALPHAS      Optional dw_forward alpha sweep. Default: use config alpha.
 #   DATA_DIR            Directory containing burgers_*.npz. Default: data.
 #   PLOT_BACKEND        Plot backend. Default: matplotlib.
@@ -47,8 +47,6 @@ EVAL_EVERY_EPOCHS="${EVAL_EVERY_EPOCHS:-1}"
 RAD_USE="${RAD_USE:-0}"
 RAD_RATIO="${RAD_RATIO:-0.8}"
 RAD_DOMAIN_BATCH="${RAD_DOMAIN_BATCH:-1000}"
-RAD_BOUNDARY_BATCH="${RAD_BOUNDARY_BATCH:-2}"
-RAD_INITIAL_BATCH="${RAD_INITIAL_BATCH:-2}"
 HIDDEN_DIM="${HIDDEN_DIM:-64}"
 NUM_LAYERS="${NUM_LAYERS:-4}"
 PLOT_GRID="${PLOT_GRID:-80}"
@@ -164,6 +162,20 @@ alpha_token() {
   esac
 }
 
+lshape_alpha_token() {
+  local alpha="$1"
+  case "${alpha}" in
+    1.25|1.250) printf '1p25' ;;
+    1.5|1.50|1.500) printf '1p50' ;;
+    1.75|1.750) printf '1p75' ;;
+    *)
+      printf 'Unsupported lshape alpha: %s\n' "${alpha}" >&2
+      printf 'Available reference data: 1.25, 1.5, 1.75\n' >&2
+      exit 1
+      ;;
+  esac
+}
+
 case_default() {
   local case_name="$1"
   local field="$2"
@@ -237,7 +249,20 @@ run_one() {
         run_dir="outputs/pytorch_1d/dw_forward/${method}/${run_stamp}"
       fi
       ;;
-    irregular_hole|lshape)
+    lshape)
+      if [[ -n "${alpha}" ]]; then
+        token="$(lshape_alpha_token "${alpha}")"
+        datafile="${DATA_DIR}/lshape/lshape_reference_alpha${token}.npz"
+        if [[ ! -f "${datafile}" ]]; then
+          printf 'Missing reference data: %s\n' "${datafile}" >&2
+          exit 1
+        fi
+        run_dir="outputs/pytorch_2d/lshape/alpha${alpha}/${method}/${run_stamp}"
+      else
+        run_dir="outputs/pytorch_2d/lshape/${method}/${run_stamp}"
+      fi
+      ;;
+    irregular_hole)
       run_dir="outputs/pytorch_2d/${case_name}/${method}/${run_stamp}"
       ;;
   esac
@@ -267,8 +292,6 @@ run_one() {
     "trainer.rad.use=${rad_use_bool}"
     "trainer.rad.ratio=${RAD_RATIO}"
     "trainer.rad.batch.domain=${RAD_DOMAIN_BATCH}"
-    "trainer.rad.batch.boundary=${RAD_BOUNDARY_BATCH}"
-    "trainer.rad.batch.initial=${RAD_INITIAL_BATCH}"
     "pde.gauss_jacobi_params.nums=${gj_quad}"
     "pde.gj_params.nums=${gj_quad}"
     "pde.monte_carlo_params.nums=${mc_quad}"
@@ -281,6 +304,8 @@ run_one() {
     cmd+=("pde.alpha=${alpha}" "pde.datafile=${datafile}")
   elif [[ "${case_name}" == "dw_forward" && -n "${alpha}" ]]; then
     cmd+=("pde.alpha=${alpha}")
+  elif [[ "${case_name}" == "lshape" && -n "${alpha}" ]]; then
+    cmd+=("pde.alpha=${alpha}" "pde.reference_data=${datafile}")
   fi
 
   if [[ "${case_name}" == "irregular_hole" || "${case_name}" == "lshape" ]]; then
@@ -317,6 +342,10 @@ fi
 for case_name in "${CASES_LIST[@]}"; do
   for method in "${METHODS_LIST[@]}"; do
     if [[ "${case_name}" == "burgers" ]]; then
+      for alpha_raw in "${BURGERS_ALPHAS[@]}"; do
+        run_one "${case_name}" "${method}" "$(trim "${alpha_raw}")"
+      done
+    elif [[ "${case_name}" == "lshape" && "${#BURGERS_ALPHAS[@]}" -gt 0 ]]; then
       for alpha_raw in "${BURGERS_ALPHAS[@]}"; do
         run_one "${case_name}" "${method}" "$(trim "${alpha_raw}")"
       done

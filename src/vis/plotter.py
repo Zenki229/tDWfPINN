@@ -47,6 +47,39 @@ class BasePlotter:
             return int(self.cfg.plot.dpi)
         return 100
 
+    def plot_2d_scatter_rad(
+        self,
+        kept_xy: np.ndarray,
+        rad_xy: np.ndarray,
+        title: str,
+        name: str,
+        xlim: Optional[tuple] = None,
+        ylim: Optional[tuple] = None,
+    ):
+        self.save_state(name, {"kept_xy": kept_xy, "rad_xy": rad_xy})
+        font_size = self._resolve_font_size(None)
+        plt.rcParams.update({"font.size": font_size})
+        fig, ax = plt.subplots(layout="constrained", figsize=(6.4, 4.8))
+        if kept_xy is not None and kept_xy.size > 0:
+            ax.scatter(kept_xy[:, 0], kept_xy[:, 1], c="tab:blue", s=4, alpha=0.5,
+                       label=f"kept (n={kept_xy.shape[0]})")
+        if rad_xy is not None and rad_xy.size > 0:
+            ax.scatter(rad_xy[:, 0], rad_xy[:, 1], c="tab:red", s=6, alpha=0.8,
+                       label=f"RAD (n={rad_xy.shape[0]})")
+        ax.set_title(title)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_aspect("equal", adjustable="box")
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        ax.legend(loc="best", fontsize=max(8, font_size - 2))
+        if self._jpg_enabled():
+            jpg_path = os.path.join(self.img_dir, f"{name}.jpg")
+            fig.savefig(jpg_path, dpi=self._resolve_dpi())
+        plt.close(fig)
+
     def plot_2d_field(
         self,
         x: np.ndarray,

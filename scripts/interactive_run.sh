@@ -290,6 +290,14 @@ case_uses_burgers() {
   [[ "${CASES_ARG}" == "burgers" || "${CASES_ARG}" == "1d" || "${CASES_ARG}" == "all" ]]
 }
 
+case_uses_lshape_alpha() {
+  [[ "${CASES_ARG}" == "lshape" || "${CASES_ARG}" == "2d" || "${CASES_ARG}" == "all" ]]
+}
+
+case_uses_alpha_sweep() {
+  case_uses_burgers || case_uses_lshape_alpha
+}
+
 count_csv_items() {
   local csv="$1"
   local -a items
@@ -304,11 +312,10 @@ case_units() {
   fi
 
   case "${CASES_ARG}" in
-    burgers) printf '%d' "${alpha_count}" ;;
-    dw_forward|lshape|irregular_hole) printf '1' ;;
-    1d) printf '%d' "$((1 + alpha_count))" ;;
-    2d) printf '2' ;;
-    all) printf '%d' "$((3 + alpha_count))" ;;
+    burgers|lshape) printf '%d' "${alpha_count}" ;;
+    dw_forward|irregular_hole) printf '1' ;;
+    1d|2d) printf '%d' "$((1 + alpha_count))" ;;
+    all) printf '%d' "$((2 + 2 * alpha_count))" ;;
     *) printf '1' ;;
   esac
 }
@@ -324,8 +331,8 @@ print_summary() {
 
   section 'Run Summary'
   print_row 'Cases' "${CASES_ARG}"
-  if case_uses_burgers; then
-    print_row 'Burgers alphas' "${ALPHAS_CSV}"
+  if case_uses_alpha_sweep; then
+    print_row 'Alphas' "${ALPHAS_CSV}"
   fi
   print_row 'Methods' "${METHODS_CSV}"
   print_row 'Estimated runs' "${total_runs}"
@@ -345,8 +352,6 @@ print_summary() {
   print_row 'RAD_USE' "${RAD_USE}"
   print_row 'RAD_RATIO' "${RAD_RATIO}"
   print_row 'RAD_DOMAIN_BATCH' "${RAD_DOMAIN_BATCH}"
-  print_row 'RAD_BOUNDARY_BATCH' "${RAD_BOUNDARY_BATCH}"
-  print_row 'RAD_INITIAL_BATCH' "${RAD_INITIAL_BATCH}"
   printf '\n'
   print_row 'GJ_QUAD' "${GJ_QUAD}"
   print_row 'MC_QUAD' "${MC_QUAD}"
@@ -374,8 +379,6 @@ INITIAL_BATCH="${INITIAL_BATCH}" \\
 RAD_USE="${RAD_USE}" \\
 RAD_RATIO="${RAD_RATIO}" \\
 RAD_DOMAIN_BATCH="${RAD_DOMAIN_BATCH}" \\
-RAD_BOUNDARY_BATCH="${RAD_BOUNDARY_BATCH}" \\
-RAD_INITIAL_BATCH="${RAD_INITIAL_BATCH}" \\
 GJ_QUAD="${GJ_QUAD}" \\
 MC_QUAD="${MC_QUAD}" \\
 HIDDEN_DIM="${HIDDEN_DIM}" \\
@@ -433,8 +436,8 @@ main() {
 
   section '1. Target'
   choose_one CASES_ARG "lshape" "Select PDE target" "${CASE_OPTIONS[@]}"
-  if case_uses_burgers; then
-    ask_value ALPHAS_CSV "1.5" "Burgers alpha list" is_alpha_list "available: 1.25,1.5,1.75"
+  if case_uses_alpha_sweep; then
+    ask_value ALPHAS_CSV "1.5" "Alpha list (burgers/lshape)" is_alpha_list "available: 1.25,1.5,1.75"
   else
     ALPHAS_CSV=""
   fi
@@ -475,9 +478,7 @@ main() {
   ask_value INITIAL_BATCH "${batch_initial_default}" "Initial-condition batch size" is_positive_int
   ask_yes_no RAD_USE "0" "Enable residual-adaptive sampling (RAD)?"
   ask_value RAD_RATIO "0.8" "RAD replacement ratio" is_ratio "0 to 1"
-  ask_value RAD_DOMAIN_BATCH "1000" "RAD interior candidate batch size" is_positive_int
-  ask_value RAD_BOUNDARY_BATCH "2" "RAD boundary candidate batch size" is_positive_int
-  ask_value RAD_INITIAL_BATCH "2" "RAD initial candidate batch size" is_positive_int
+  ask_value RAD_DOMAIN_BATCH "1000" "RAD interior candidate batch size (RAD only resamples domain points)" is_positive_int
   ask_value GJ_QUAD "${gj_default}" "Gauss-Jacobi quadrature nodes" is_positive_int
   ask_value MC_QUAD "${mc_default}" "Monte Carlo samples" is_positive_int
 
@@ -494,7 +495,7 @@ main() {
   export STEPS STEPS_PER_EPOCH USE_LBFGS LBFGS_MAX_ITER
   export TIMING_EPOCH_STEPS LOSS_LOG_EVERY EVAL_EVERY_STEPS EVAL_EVERY_EPOCHS
   export DOMAIN_BATCH BOUNDARY_BATCH INITIAL_BATCH
-  export RAD_USE RAD_RATIO RAD_DOMAIN_BATCH RAD_BOUNDARY_BATCH RAD_INITIAL_BATCH
+  export RAD_USE RAD_RATIO RAD_DOMAIN_BATCH
   export GJ_QUAD MC_QUAD HIDDEN_DIM NUM_LAYERS PLOT_GRID WANDB_MODE
   export ALPHAS="${ALPHAS_CSV:-}"
   export PYTHON="${PYTHON_BIN}"

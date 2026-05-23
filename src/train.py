@@ -106,6 +106,8 @@ class Trainer:
             _cfg_get(self.train_cfg, "eval_every_steps", self.timing_epoch_steps)
         )
         self.eval_every_epochs = int(_cfg_get(self.train_cfg, "eval_every_epochs", 1))
+        self._last_rad_kept_points = None
+        self._last_rad_selected_points = None
 
     def _build_pde(self):
         pde_name = str(getattr(self.cfg.pde, "name", "dw_forward"))
@@ -266,9 +268,13 @@ class Trainer:
         n_keep = current_domain.shape[0] - n_rad
         if n_keep > 0:
             keep_idx = torch.randperm(current_domain.shape[0], device=self.device)[:n_keep]
-            points["domain"] = torch.cat([current_domain[keep_idx], rad_selected], dim=0)
+            kept_points = current_domain[keep_idx]
+            points["domain"] = torch.cat([kept_points, rad_selected], dim=0)
         else:
+            kept_points = current_domain[:0]
             points["domain"] = rad_selected
+        self._last_rad_kept_points = kept_points.detach().cpu().numpy()
+        self._last_rad_selected_points = rad_selected.detach().cpu().numpy()
         return points
 
     def _loss_closure(self, points, optimizer=None, backward=True):
@@ -587,6 +593,9 @@ class Trainer:
                 vmin=0.0,
                 vmax=float(np.nanmax(err_grid)),
             )
+            self._plot_rad_scatter_at_time(
+                time_value, time_values, x_grid, y_grid, token, step
+            )
         if rel_errors:
             mean_rel = float(np.nanmean(rel_errors))
             wandb.log({
@@ -595,6 +604,30 @@ class Trainer:
                 "L2_Relative_Error": mean_rel,
             })
             log.info(f"Step {step}: 2D mean L2 Error = {mean_rel:.2e}")
+
+    def _plot_rad_scatter_at_time(self, time_value, time_values, x_grid, y_grid, token, step):
+        kept = self._last_rad_kept_points
+        rad = self._last_rad_selected_points
+        if kept is None and rad is None:
+            return
+        if kept is not None and kept.shape[1] < 3:
+            return
+        if rad is not None and rad.shape[1] < 3:
+            return
+        t_min = float(self.cfg.pde.t_lim[0])
+        t_max = float(self.cfg.pde.t_lim[1])
+        n_slices = max(len(time_values), 1)
+        dt_tol = max((t_max - t_min) / (2 * n_slices), 1e-6)
+        kept_xy = kept[np.abs(kept[:, 0] - time_value) <= dt_tol][:, 1:3] if kept is not None else None
+        rad_xy = rad[np.abs(rad[:, 0] - time_value) <= dt_tol][:, 1:3] if rad is not None else None
+        self.plotter.plot_2d_scatter_rad(
+            kept_xy,
+            rad_xy,
+            f"RAD sampling, t={time_value:.3f} (±{dt_tol:.3f})",
+            f"{self.cfg.pde.name}_{token}_rad_scatter_step_{step}",
+            xlim=(float(np.min(x_grid)), float(np.max(x_grid))),
+            ylim=(float(np.min(y_grid)), float(np.max(y_grid))),
+        )
 
     def save_checkpoint(self, step):
         path = os.path.join(os.getcwd(), f"checkpoint_{step}.pt")

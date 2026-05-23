@@ -249,6 +249,12 @@ Run Burgers over the available reference alphas:
 ALPHAS=1.25,1.5,1.75 STEPS=5000 GJ_QUAD=80 MC_QUAD=80 bash scripts/run_pytorch_cases.sh burgers GJ-I,GJ-II
 ```
 
+Run the L-shape benchmark over the matching reference alphas:
+
+```bash
+ALPHAS=1.25,1.5,1.75 STEPS=50000 GJ_QUAD=64 bash scripts/run_pytorch_cases.sh lshape GJ-II
+```
+
 Run a small RAD-enabled smoke case:
 
 ```bash
@@ -261,7 +267,7 @@ Important script parameters:
 | --- | --- | --- |
 | `CASES` | Default case selection if positional `$1` is omitted | `2d` |
 | `METHODS` | Default method selection if positional `$2` is omitted | `GJ-I,GJ-II,MC-I,MC-II` |
-| `ALPHAS` | Burgers reference alpha list | `1.25,1.5,1.75` |
+| `ALPHAS` | Burgers / L-shape reference alpha list | `1.25,1.5,1.75` |
 | `FORWARD_ALPHAS` | Optional `dw_forward` alpha sweep | unset |
 | `STEPS` | Adam update steps | `5000` |
 | `STEPS_PER_EPOCH` | Adam updates per hybrid epoch | `5000` |
@@ -274,11 +280,9 @@ Important script parameters:
 | `DOMAIN_BATCH` | Interior collocation batch size | case default |
 | `BOUNDARY_BATCH` | Boundary batch size | case default |
 | `INITIAL_BATCH` | Initial-condition batch size | case default |
-| `RAD_USE` | Enable residual-adaptive sampling | `0` |
+| `RAD_USE` | Enable residual-adaptive sampling (domain only) | `0` |
 | `RAD_RATIO` | Fraction of training domain points replaced by RAD | `0.8` |
 | `RAD_DOMAIN_BATCH` | Interior candidate batch for RAD | `1000` |
-| `RAD_BOUNDARY_BATCH` | Boundary candidate batch for RAD | `2` |
-| `RAD_INITIAL_BATCH` | Initial candidate batch for RAD | `2` |
 | `GJ_QUAD` | Gauss-Jacobi nodes | case default |
 | `MC_QUAD` | Monte Carlo samples | case default |
 | `HIDDEN_DIM` | MLP hidden width | `64` |
@@ -313,14 +317,15 @@ The selector walks through four sections. Each row below shows the prompt, the
 environment variable it sets, and the Hydra override that
 `scripts/run_pytorch_cases.sh` ultimately emits.
 
-**1. Target.** Selects the PDE, the optional Burgers alpha list, and the
+**1. Target.** Selects the PDE, the optional alpha list, and the
 quadrature methods. The estimated run count is `(case units) x (number of methods)`,
-where `burgers` contributes one unit per alpha and the other cases contribute one each.
+where `burgers` and `lshape` each contribute one unit per alpha and the other
+cases contribute one each.
 
 | Prompt | Variable | Effect |
 | --- | --- | --- |
 | Select PDE target | `CASES_ARG` (positional `$1`) | Picks `pde=<case>` (or expands `1d`, `2d`, `all`). |
-| Burgers alpha list | `ALPHAS` | One run per alpha, with `pde.alpha=<a>` and `pde.datafile=data/burgers_<token>.npz`. |
+| Alpha list (burgers/lshape) | `ALPHAS` | One run per alpha. For `burgers` sets `pde.alpha=<a>` and `pde.datafile=data/burgers_<token>.npz`; for `lshape` sets `pde.alpha=<a>` and `pde.reference_data=data/lshape/lshape_reference_alpha<token>.npz`. |
 | Select integration methods | `METHODS_CSV` (positional `$2`) | Sets `pde.method=<m>` for each chosen method. |
 
 **2. Training Schedule.** Adam, L-BFGS hybrid, and logging cadence.
@@ -343,11 +348,9 @@ where `burgers` contributes one unit per alpha and the other cases contribute on
 | Interior collocation batch size | `DOMAIN_BATCH` | `trainer.batch_size.domain` |
 | Boundary batch size | `BOUNDARY_BATCH` | `trainer.batch_size.boundary` |
 | Initial-condition batch size | `INITIAL_BATCH` | `trainer.batch_size.initial` |
-| Enable residual-adaptive sampling (RAD)? | `RAD_USE` | `trainer.rad.use` |
-| RAD replacement ratio | `RAD_RATIO` | `trainer.rad.ratio` |
+| Enable residual-adaptive sampling (RAD, domain only) | `RAD_USE` | `trainer.rad.use` |
+| RAD replacement ratio (domain points) | `RAD_RATIO` | `trainer.rad.ratio` |
 | RAD interior candidate batch size | `RAD_DOMAIN_BATCH` | `trainer.rad.batch.domain` |
-| RAD boundary candidate batch size | `RAD_BOUNDARY_BATCH` | `trainer.rad.batch.boundary` |
-| RAD initial candidate batch size | `RAD_INITIAL_BATCH` | `trainer.rad.batch.initial` |
 | Gauss-Jacobi quadrature nodes | `GJ_QUAD` | `pde.gj_params.nums` and `pde.gauss_jacobi_params.nums` |
 | Monte Carlo samples | `MC_QUAD` | `pde.monte_carlo_params.nums` |
 
@@ -380,6 +383,7 @@ The unified timing scripts use case-specific directories:
 
 ```text
 outputs/pytorch_2d/<case>/<method>/<YYYY-MM-DD_HH-MM-SS>/
+outputs/pytorch_2d/lshape/alpha<alpha>/<method>/<YYYY-MM-DD_HH-MM-SS>/
 outputs/pytorch_burgers/alpha<alpha>/<method>/<YYYY-MM-DD_HH-MM-SS>/
 outputs/pytorch_1d/dw_forward/<method>/<YYYY-MM-DD_HH-MM-SS>/
 ```
