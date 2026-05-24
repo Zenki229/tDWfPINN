@@ -16,6 +16,30 @@ Monte Carlo or Gauss-Jacobi quadrature:
 | `GJ-I` | Type-I | Gauss-Jacobi |
 | `GJ-II` | Type-II | Gauss-Jacobi |
 
+## Precision Requirement
+
+This implementation is intended to run in `torch.float64`. The training entry
+point sets
+
+```python
+torch.set_default_dtype(torch.float64)
+```
+
+inside `main()` before constructing the model, PDE objects, samplers, and
+optimizers. Keep this default for all reported runs.
+
+This is not only a quality setting. The transformed Type-II formulas
+(`MC-II` and `GJ-II`) subtract nearby network values and divide by small
+time-increment powers such as `tau^2` and `t^alpha`. In fp32, the cancellation
+and small denominators can amplify roundoff enough to make the residual and
+loss blow up, especially near `t = 0` or when the quadrature resolution is
+increased. Type-I is usually less sensitive, but mixed precision between the
+model, sampled points, quadrature nodes, and reference tensors can still create
+incorrect comparisons or runtime dtype errors.
+
+Do not switch this branch to fp32 unless the fractional operators and Type-II
+stability are re-audited end to end.
+
 The current PyTorch branch includes two one-dimensional benchmarks plus two
 registered two-dimensional irregular-domain cases:
 
