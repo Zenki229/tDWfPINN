@@ -18,6 +18,46 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
+        },
+        {
+            "name": "Train Debug: lshape GJ-II",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/train.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "pde=lshape",
+                "pde.method=GJ-II",
+                "pde.alpha=1.5",
+                "pde.reference_data=data/lshape/lshape_reference_alpha1p50.npz",
+                "pde.plot_grid=80",
+                "pde.gj_params.nums=64",
+                "pde.gauss_jacobi_params.nums=64",
+                "pde.monte_carlo_params.nums=640",
+                "trainer.max_steps=50000",
+                "trainer.steps_per_epoch=5000",
+                "trainer.timing.epoch_steps=5000",
+                "trainer.loss_log_every_steps=100",
+                "trainer.eval_every_steps=5000",
+                "trainer.eval_every_epochs=1",
+                "trainer.batch_size.domain=100000",
+                "trainer.batch_size.boundary=5000",
+                "trainer.batch_size.initial=5000",
+                "trainer.rad.use=true",
+                "trainer.rad.ratio=0.3",
+                "trainer.rad.batch.domain=100000",
+                "model.hidden_dim=64",
+                "model.num_layers=6",
+                "optimizer.lbfgs.use=true",
+                "optimizer.lbfgs.max_iter=2000",
+                "wandb.mode=online",
+                "plot=matplotlib"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "KMP_DUPLICATE_LIB_OK": "TRUE"
+            }
         }
     ]
 }

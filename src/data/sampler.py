@@ -180,7 +180,7 @@ class IrregularHoleSampler(BaseSampler):
                  device: torch.device, center=(-0.3, 0.2), r0=0.25):
         super().__init__(batch_size, device)
         self.time_lim = time_lim
-        self.center = torch.tensor(list(center), device=device, dtype=torch.float32)
+        self.center = torch.tensor(list(center), device=device)
         self.r0 = float(r0)
 
     def _sample_time(self, n: int) -> Tensor:

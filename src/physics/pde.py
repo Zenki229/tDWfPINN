@@ -82,7 +82,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         num_points = len(points)
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-        taus: torch.Tensor = torch.from_numpy(taus).to(device=self.device, dtype=points.dtype)
+        taus: torch.Tensor = torch.tensor(taus.tolist(), device=self.device)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
         t0.requires_grad = True
         val0 = self.u_net(net, t0)
@@ -100,7 +100,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         t_minus_t_tau = points[:, 0] - t_tau
         t_tau_clip = torch.maximum(
             t_tau,
-            torch.tensor(monte_carlo_eps, device=self.device, dtype=points.dtype),
+            torch.tensor(monte_carlo_eps, device=self.device),
         )
         x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
         new_points = torch.stack((t_minus_t_tau, x), dim=2)
@@ -128,7 +128,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         num_points = len(points)
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-        taus: torch.Tensor = torch.from_numpy(taus).to(device=self.device, dtype=points.dtype)
+        taus: torch.Tensor = torch.tensor(taus.tolist(), device=self.device)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
         t0.requires_grad = True
         val0 = self.u_net(net, t0)
@@ -146,7 +146,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         t_minus_t_tau = points[:, 0] - t_tau
         t_tau_clip = torch.maximum(
             t_tau,
-            torch.tensor(monte_carlo_eps, device=self.device, dtype=points.dtype),
+            torch.tensor(monte_carlo_eps, device=self.device),
         )
         x = points[:, 1].unsqueeze(0).expand(monte_carlo_nums, num_points).clone()
         new_points = torch.stack((t_minus_t_tau, x), dim=2)
@@ -164,8 +164,8 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         alpha = self.alpha
         nums = self.cfg.pde.gj_params.nums
         num_points = len(points)
-        taus = torch.from_numpy(self.quad_t).to(self.device).float()
-        quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+        taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+        quad_w = torch.tensor(self.quad_w.tolist(), device=self.device)
         quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
@@ -207,8 +207,8 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
         coeff_for_frac_dt = sp.gamma(2 - alpha)
         nums = self.cfg.pde.gj_params.nums
         num_points = len(points)
-        taus = torch.from_numpy(self.quad_t).to(self.device).float()
-        quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+        taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+        quad_w = torch.tensor(self.quad_w.tolist(), device=self.device)
         quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
         t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(self.device)
         t0.requires_grad = True
@@ -265,7 +265,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
             num_points = len(points)
             coeff_for_frac_dt = sp.gamma(2 - alpha)
             taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-            taus = torch.from_numpy(taus).to(self.device)
+            taus = torch.tensor(taus.tolist(), device=self.device)
             t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
             dt0 = self.exact_dt(t0)
             t = points[:, 0:1].clone()
@@ -288,7 +288,7 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
             num_points = len(points)
             coeff_for_frac_dt = sp.gamma(2 - alpha)
             taus = beta.rvs(2 - alpha, 1, size=monte_carlo_nums)
-            taus = torch.from_numpy(taus).to(self.device)
+            taus = torch.tensor(taus.tolist(), device=self.device)
             t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
             val0 = self.exact(t0)
             dt0 = self.exact_dt(t0)
@@ -311,8 +311,8 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
             alpha = self.alpha
             nums = self.cfg.pde.gj_params.nums
             num_points = len(points)
-            taus = torch.from_numpy(self.quad_t).to(self.device).float()
-            quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+            taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+            quad_w = torch.tensor(self.quad_w.tolist(), device=self.device)
             quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
             coeff_for_frac_dt = sp.gamma(2 - alpha)
             t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(device=self.device)
@@ -334,8 +334,8 @@ class TimeFracCaputoDiffusionWaveTwoDimPDE(PDE):
             coeff_for_frac_dt = sp.gamma(2 - alpha)
             nums = self.cfg.pde.gj_params.nums
             num_points = len(points)
-            taus = torch.from_numpy(self.quad_t).to(self.device).float()
-            quad_w = torch.from_numpy(self.quad_w).to(self.device).float()
+            taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+            quad_w = torch.tensor(self.quad_w.tolist(), device=self.device)
             quad_w = quad_w.unsqueeze(-1).unsqueeze(-1)
             t0 = torch.cat((torch.zeros_like(points[:, 0:1]), points[:, 1:]), dim=1).to(self.device)
             val0 = self.exact(t0)

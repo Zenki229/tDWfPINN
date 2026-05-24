@@ -496,7 +496,7 @@ class Trainer:
             T, X = np.meshgrid(t_eval, x_eval)
             
             points_np = np.stack([T.flatten(), X.flatten()], axis=1)
-            points_tensor = torch.from_numpy(points_np).float().to(self.device)
+            points_tensor = torch.from_numpy(points_np).to(self.device)
             
             u_pred = self.model(points_tensor).cpu().numpy().reshape(T.shape)
             u_exact = self.pde.exact(points_tensor).cpu().numpy().reshape(T.shape)
@@ -522,7 +522,7 @@ class Trainer:
         outputs = []
         with torch.no_grad():
             for start in range(0, len(points_np), chunk_size):
-                chunk = torch.from_numpy(points_np[start:start + chunk_size]).float().to(self.device)
+                chunk = torch.from_numpy(points_np[start:start + chunk_size]).to(self.device)
                 outputs.append(self.model(chunk).detach().cpu().numpy().reshape(-1))
         return np.concatenate(outputs, axis=0)
 
@@ -543,8 +543,8 @@ class Trainer:
                     x_grid[mask],
                     y_grid[mask],
                 ], axis=1)
-                points_tensor = torch.from_numpy(points_np).float().to(self.device)
-                true_grid = np.full_like(x_grid, np.nan, dtype=float)
+                points_tensor = torch.from_numpy(points_np).to(self.device)
+                true_grid = np.full_like(x_grid, np.nan)
                 true_grid[mask] = self.pde.exact(points_tensor).detach().cpu().numpy().reshape(-1)
                 slices.append((time_value, true_grid))
 
@@ -556,7 +556,7 @@ class Trainer:
                 x_grid[mask],
                 y_grid[mask],
             ], axis=1)
-            pred_grid = np.full_like(true_grid, np.nan, dtype=float)
+            pred_grid = np.full_like(true_grid, np.nan)
             pred_grid[mask] = self._predict_numpy(points_np)
             err_grid = np.abs(pred_grid - true_grid)
             denom = np.linalg.norm(true_grid[mask])
@@ -635,6 +635,8 @@ class Trainer:
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
+    torch.set_default_dtype(torch.float64)
+    log.info("Torch default dtype set to %s", torch.get_default_dtype())
     log.info(OmegaConf.to_yaml(cfg))
     run:wandb.run = setup_wandb(cfg)
     trainer = Trainer(cfg, run)

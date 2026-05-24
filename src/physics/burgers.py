@@ -32,9 +32,9 @@ class TimeFracBurgers1D(TimeFracCaputoDiffusionWaveTwoDimPDE):
 
     def _load_reference(self):
         data = np.load(self.datafile)
-        self.ref_t = np.asarray(data["t"], dtype=float)
-        self.ref_x = np.asarray(data["x"], dtype=float)
-        self.ref_u = np.asarray(data["u"], dtype=float)
+        self.ref_t = np.asarray(data["t"])
+        self.ref_x = np.asarray(data["x"])
+        self.ref_u = np.asarray(data["u"])
         self._interp = RegularGridInterpolator(
             (self.ref_t, self.ref_x),
             self.ref_u,
@@ -105,4 +105,4 @@ class TimeFracBurgers1D(TimeFracCaputoDiffusionWaveTwoDimPDE):
     def exact(self, points: Tensor) -> Tensor:
         points_np = points.detach().cpu().numpy()
         values = self._interp(points_np[:, :2]).reshape(-1, 1)
-        return torch.from_numpy(values).to(device=self.device, dtype=points.dtype)
+        return torch.tensor(values.tolist(), device=self.device)

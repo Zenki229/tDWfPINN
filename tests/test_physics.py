@@ -23,7 +23,7 @@ def test_fraction_operator_with_plot():
     x_eval = np.linspace(0.0, 1.0, 50)
     T, X = np.meshgrid(t_eval, x_eval)
     points_np = np.stack([T.flatten(), X.flatten()], axis=1)
-    points = torch.from_numpy(points_np).to(device=device, dtype=torch.float64)
+    points = torch.from_numpy(points_np).to(device=device)
     methods = ["MC-I"]
     for idx, method in enumerate(methods):
         cfg = OmegaConf.create({

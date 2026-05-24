@@ -153,9 +153,9 @@ class Irregular2DBase(PDE):
         dt0 = self._dt0(net, points)
         den = torch.clamp(t_tau, min=eps).unsqueeze(-1)
         integral = torch.mean((dt.unsqueeze(0) - dt_tau) / den, dim=0)
-        safe_t = torch.clamp(points[:, 0:1], min=eps)
-        part1 = ((self.alpha - 1) / (2 - self.alpha)) * safe_t ** (2 - self.alpha) * integral
-        part2 = (dt - dt0) * safe_t ** (1 - self.alpha)
+        t = points[:, 0:1]
+        part1 = ((self.alpha - 1) / (2 - self.alpha)) * t ** (2 - self.alpha) * integral
+        part2 = (dt - dt0) * t ** (1 - self.alpha)
         return (part1 + part2) / coeff
 
     def _mc_ii(self, net: nn.Module, points: Tensor, val: Tensor, dt: Tensor) -> Tensor:
@@ -169,41 +169,39 @@ class Irregular2DBase(PDE):
         den = torch.clamp(t_tau ** 2, min=eps).unsqueeze(-1)
         val3 = t_tau.unsqueeze(-1) * dt.unsqueeze(0)
         integral = torch.mean((val.unsqueeze(0) - val2 - val3) / den, dim=0)
-        safe_t = torch.clamp(points[:, 0:1], min=eps)
-        part1 = self.alpha * (self.alpha - 1) / (2 - self.alpha) * safe_t ** (2 - self.alpha) * integral
-        part2 = (self.alpha - 1) * (val - val0 - points[:, 0:1] * dt) / safe_t ** self.alpha
-        part3 = (dt - dt0) / safe_t ** (self.alpha - 1)
+        t = points[:, 0:1]
+        part1 = self.alpha * (self.alpha - 1) / (2 - self.alpha) * t ** (2 - self.alpha) * integral
+        part2 = (self.alpha - 1) * (val - val0 - t * dt) / t ** self.alpha
+        part3 = (dt - dt0) / t ** (self.alpha - 1)
         return (part3 - part2 - part1) / coeff
 
     def _gj_i(self, net: nn.Module, points: Tensor, dt: Tensor) -> Tensor:
         coeff = sp.gamma(2 - self.alpha)
-        taus = torch.from_numpy(self.quad_t).to(self.device).float()
-        quad_w = torch.from_numpy(self.quad_w).to(self.device).float().reshape(-1, 1, 1)
+        taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+        quad_w = torch.tensor(self.quad_w.tolist(), device=self.device).reshape(-1, 1, 1)
         new_points, t_tau = self._quad_points(points, taus)
         dt_tau = self._quad_dt(net, new_points)
         dt0 = self._dt0(net, points)
-        den = torch.clamp(t_tau, min=1e-10).unsqueeze(-1)
-        integral = torch.sum(quad_w * (dt.unsqueeze(0) - dt_tau) / den, dim=0)
-        safe_t = torch.clamp(points[:, 0:1], min=1e-10)
-        part1 = (self.alpha - 1) * safe_t ** (2 - self.alpha) * integral
-        part2 = (dt - dt0) * safe_t ** (1 - self.alpha)
+        integral = torch.sum(quad_w * (dt.unsqueeze(0) - dt_tau) / t_tau.unsqueeze(-1), dim=0)
+        t = points[:, 0:1]
+        part1 = (self.alpha - 1) * t ** (2 - self.alpha) * integral
+        part2 = (dt - dt0) * t ** (1 - self.alpha)
         return (part1 + part2) / coeff
 
     def _gj_ii(self, net: nn.Module, points: Tensor, val: Tensor, dt: Tensor) -> Tensor:
         coeff = sp.gamma(2 - self.alpha)
-        taus = torch.from_numpy(self.quad_t).to(self.device).float()
-        quad_w = torch.from_numpy(self.quad_w).to(self.device).float().reshape(-1, 1, 1)
+        taus = torch.tensor(self.quad_t.tolist(), device=self.device)
+        quad_w = torch.tensor(self.quad_w.tolist(), device=self.device).reshape(-1, 1, 1)
         new_points, t_tau = self._quad_points(points, taus)
         val2 = self.u_net(net, new_points)
         val0 = self._val0(net, points)
         dt0 = self._dt0(net, points)
-        den = torch.clamp(t_tau ** 2, min=1e-10).unsqueeze(-1)
         val3 = t_tau.unsqueeze(-1) * dt.unsqueeze(0)
-        integral = torch.sum(quad_w * (val.unsqueeze(0) - val2 - val3) / den, dim=0)
-        safe_t = torch.clamp(points[:, 0:1], min=1e-10)
-        part1 = self.alpha * (self.alpha - 1) * safe_t ** (2 - self.alpha) * integral
-        part2 = (self.alpha - 1) * (val - val0 - points[:, 0:1] * dt) / safe_t ** self.alpha
-        part3 = (dt - dt0) / safe_t ** (self.alpha - 1)
+        integral = torch.sum(quad_w * (val.unsqueeze(0) - val2 - val3) / (t_tau ** 2).unsqueeze(-1), dim=0)
+        t = points[:, 0:1]
+        part1 = self.alpha * (self.alpha - 1) * t ** (2 - self.alpha) * integral
+        part2 = (self.alpha - 1) * (val - val0 - t * dt) / t ** self.alpha
+        part3 = (dt - dt0) / t ** (self.alpha - 1)
         return (part3 - part2 - part1) / coeff
 
     def plot_time_slices(self) -> List[float]:
@@ -363,7 +361,7 @@ class LShape2D(Irregular2DBase):
         xi = np.abs(xs[:, None] - pts[:, 1][None, :]).argmin(axis=0)
         yi = np.abs(ys[:, None] - pts[:, 2][None, :]).argmin(axis=0)
         vals = snapshots[ti, yi, xi].reshape(-1, 1)
-        return torch.from_numpy(vals).float().to(self.device)
+        return torch.tensor(vals.tolist(), device=self.device)
 
     def reference_slices(self, time_values: Iterable[float]):
         if self._reference is None:
