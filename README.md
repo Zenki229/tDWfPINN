@@ -249,6 +249,11 @@ Training loss is logged every `trainer.loss_log_every_steps` Adam steps
 evaluation boundaries: every `trainer.eval_every_steps` in Adam-only runs and
 every `trainer.eval_every_epochs` hybrid epoch by default.
 
+For 2D cases, the `abs_error` figure title reports the relative L2 error for
+that plotted time slice. W&B `eval/relative_error` and `L2_Relative_Error`
+record the combined relative L2 error over all evaluated 2D points by
+accumulating the global numerator and denominator before taking the ratio.
+
 ## Unified Script Runs
 
 Use the unified PyTorch script for both 1D and 2D cases. Case aliases are

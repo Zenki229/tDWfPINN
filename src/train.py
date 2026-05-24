@@ -548,7 +548,8 @@ class Trainer:
                 true_grid[mask] = self.pde.exact(points_tensor).detach().cpu().numpy().reshape(-1)
                 slices.append((time_value, true_grid))
 
-        rel_errors = []
+        global_err_sq = 0.0
+        global_true_sq = 0.0
         for time_value, true_grid in slices:
             mask = np.isfinite(true_grid)
             points_np = np.stack([
@@ -559,9 +560,12 @@ class Trainer:
             pred_grid = np.full_like(true_grid, np.nan)
             pred_grid[mask] = self._predict_numpy(points_np)
             err_grid = np.abs(pred_grid - true_grid)
-            denom = np.linalg.norm(true_grid[mask])
-            rel_err = np.nan if denom < 1e-14 else np.linalg.norm(pred_grid[mask] - true_grid[mask]) / denom
-            rel_errors.append(rel_err)
+            diff = pred_grid[mask] - true_grid[mask]
+            true_vals = true_grid[mask]
+            slice_true_norm = np.linalg.norm(true_vals)
+            rel_err = np.nan if slice_true_norm < 1e-14 else np.linalg.norm(diff) / slice_true_norm
+            global_err_sq += float(np.sum(diff ** 2))
+            global_true_sq += float(np.sum(true_vals ** 2))
             token = f"t{time_value:.3f}".replace(".", "p")
             finite_vals = np.concatenate([true_grid[mask], pred_grid[mask]])
             vmin = float(np.nanmin(finite_vals))
@@ -588,7 +592,7 @@ class Trainer:
                 x_grid,
                 y_grid,
                 err_grid,
-                f"abs error, t={time_value:.3f}\nrelative error = {rel_err:.4e}",
+                f"abs error, t={time_value:.3f}\nslice relative error = {rel_err:.4e}",
                 f"{self.cfg.pde.name}_{token}_abs_error_step_{step}",
                 vmin=0.0,
                 vmax=float(np.nanmax(err_grid)),
@@ -596,14 +600,14 @@ class Trainer:
             self._plot_rad_scatter_at_time(
                 time_value, time_values, x_grid, y_grid, token, step
             )
-        if rel_errors:
-            mean_rel = float(np.nanmean(rel_errors))
+        if global_true_sq > 1e-28:
+            global_rel = float(np.sqrt(global_err_sq) / np.sqrt(global_true_sq))
             wandb.log({
                 "train/adam_step": step,
-                "eval/relative_error": mean_rel,
-                "L2_Relative_Error": mean_rel,
+                "eval/relative_error": global_rel,
+                "L2_Relative_Error": global_rel,
             })
-            log.info(f"Step {step}: 2D mean L2 Error = {mean_rel:.2e}")
+            log.info(f"Step {step}: 2D global L2 Error = {global_rel:.2e}")
 
     def _plot_rad_scatter_at_time(self, time_value, time_values, x_grid, y_grid, token, step):
         kept = self._last_rad_kept_points
