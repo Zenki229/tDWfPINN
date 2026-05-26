@@ -225,6 +225,15 @@ make the wave-like evolution easier to inspect.
 
 ![L-shaped reference, T=5](data/lshape/lshape_reference_T5.gif)
 
+Reference W&B project for the L-shape runs:
+[`tDWfPINN_lshape2D`](https://wandb.ai/zenki229/tDWfPINN_lshape2D/overview).
+
+Launch the full L-shape MC-I / GJ-II comparison with:
+
+```bash
+STEPS="100000" STEPS_PER_EPOCH="5000" USE_LBFGS="1" LBFGS_MAX_ITER="2000" TIMING_EPOCH_STEPS="5000" LOSS_LOG_EVERY="100" EVAL_EVERY_STEPS="5000" EVAL_EVERY_EPOCHS="1" DOMAIN_BATCH="20000" BOUNDARY_BATCH="5000" INITIAL_BATCH="5000" RAD_USE="0" RAD_RATIO="0.3" RAD_DOMAIN_BATCH="100000" GJ_QUAD="64" MC_QUAD="256" HIDDEN_DIM="64" NUM_LAYERS="6" PLOT_GRID="80" ALPHAS="1.25,1.5,1.75" WANDB_MODE="online" PYTHON="python" bash scripts/run_pytorch_cases.sh "lshape" "MC-I,GJ-II"
+```
+
 ## Training
 
 Run the default one-dimensional forward case:
