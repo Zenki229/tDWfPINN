@@ -1,2 +1,0 @@
-epoch,step,epoch_steps,elapsed_seconds,total_seconds,average_epoch_seconds,loss,adam_loss,lbfgs_loss
-1,2,2,3.00000000,3.00000000,3.00000000,5.00000000e-01,8.00000000e-01,5.00000000e-01
