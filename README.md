@@ -90,6 +90,15 @@ The script writes timestamped `test/`, `storage/`, and `flops/` outputs under
 `theoretical_analysis/tdwfpinn_empirical_complexity/outputs/`. Those generated
 outputs remain ignored by Git.
 
+When measuring GPU storage and profiler FLOPs, keep the default warm-up
+enabled. The storage and FLOPs sweep scripts run one unrecorded GJ-I/GJ-II
+warm-up pair before writing CSV rows, then clear gradients and CUDA peak
+counters before the recorded sweep. This avoids contaminating the first
+measurement with one-time CUDA context creation, caching allocator expansion,
+cuBLAS/cuDNN lazy initialization, PyTorch autograd setup, or first dispatch
+overhead. If an old CSV was collected without warm-up, use the plotting
+script's `--drop-first-pair` option before fitting savings slopes.
+
 ## Install
 
 Use a normal Python environment and install the requirements:
