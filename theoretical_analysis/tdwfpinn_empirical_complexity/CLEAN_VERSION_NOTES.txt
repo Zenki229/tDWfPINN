@@ -1,0 +1,10 @@
+Clean v5 checklist
+==================
+
+- One generalized GJ implementation path only.
+- No command-line switch for selecting an implementation path.
+- Newly produced CSV files do not include an implementation-path column.
+- Separate shell entrypoints for test, storage, FLOPs, and all-in-one runs.
+- Timestamped output directories by default.
+- Warm-up pass is enabled by default for storage and FLOPs sweeps.
+- Plotting supports --drop-first-pair for previously collected CSV files that include the first CUDA initialization measurement.

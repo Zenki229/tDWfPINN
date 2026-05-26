@@ -5,6 +5,10 @@ dw_weno/
 jaxpi/
 pinns-jax/
 theoretical_analysis/
+!theoretical_analysis/
+theoretical_analysis/*
+!theoretical_analysis/tdwfpinn_empirical_complexity/
+!theoretical_analysis/tdwfpinn_empirical_complexity/**
 __pycache__/
 *.py[cod]
 *$py.class

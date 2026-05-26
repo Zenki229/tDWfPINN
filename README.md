@@ -70,6 +70,26 @@ whereas Type-II evaluates shifted network values. The timing scripts expose
 both choices for MC and GJ so the cost can be compared with the same model,
 batch sizes, and quadrature counts.
 
+## Empirical Complexity Verification
+
+The auxiliary experiment in
+[`theoretical_analysis/tdwfpinn_empirical_complexity/`](theoretical_analysis/tdwfpinn_empirical_complexity/)
+checks the storage and backward-FLOPs savings discussed in Section 3.1.3 of
+the paper. It compares generalized Gauss-Jacobi Type-I and Type-II residual
+graphs on CUDA, measuring GPU memory behavior and profiler FLOPs with the same
+bias-free MLP cost model used by the paper.
+
+Run the full GPU verification from that directory:
+
+```bash
+cd theoretical_analysis/tdwfpinn_empirical_complexity
+bash scripts/run_all_gpu.sh
+```
+
+The script writes timestamped `test/`, `storage/`, and `flops/` outputs under
+`theoretical_analysis/tdwfpinn_empirical_complexity/outputs/`. Those generated
+outputs remain ignored by Git.
+
 ## Install
 
 Use a normal Python environment and install the requirements:
@@ -109,6 +129,7 @@ python -c "import torch; print(torch.__version__); print(torch.cuda.is_available
 | [`src/vis/`](src/vis/) | Matplotlib/Plotly plotting helpers and raw `.npz` export. |
 | [`data/`](data/) | Stored 1D Burgers arrays and 2D irregular-domain reference data. |
 | [`scripts/`](scripts/) | Shell launchers for full, debug, and 2D method timing runs. |
+| [`theoretical_analysis/tdwfpinn_empirical_complexity/`](theoretical_analysis/tdwfpinn_empirical_complexity/) | GPU memory and backward-FLOPs verification for paper Section 3.1.3. |
 | [`tests/`](tests/) | Unit tests for config loading, fractional operators, and registered 2D cases. |
 
 ## PDE Cases

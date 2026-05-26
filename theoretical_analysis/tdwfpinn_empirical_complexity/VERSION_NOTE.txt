@@ -1,0 +1,18 @@
+Clean v5 notes
+===============
+
+This version uses one implementation path only:
+all GJ-I/GJ-II differentiation is performed by tdw_verify/generalized_gj.py.
+
+Entry scripts are separated:
+- scripts/run_test_gpu.sh
+- scripts/run_storage_gpu.sh
+- scripts/run_flops_gpu.sh
+
+Default output folders are timestamped:
+- outputs/test_YYYYMMDD_HHMMSS/
+- outputs/storage_YYYYMMDD_HHMMSS/
+- outputs/flops_YYYYMMDD_HHMMSS/
+
+Storage/FLOPs sweeps run an unrecorded CUDA/autograd warm-up before recorded measurements.
+For old CSV files, plotting scripts support --drop-first-pair to remove the first recorded GJ-I/GJ-II pair.
