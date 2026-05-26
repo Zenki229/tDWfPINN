@@ -4,10 +4,11 @@
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-active-ee4c2c.svg)](https://pytorch.org/)
 
-This branch contains the PyTorch implementation of transformed
-diffusion-wave fractional PINNs for Caputo orders `alpha in (1, 2)`. The
-training code supports the transformed Type-I and Type-II formulas with either
-Monte Carlo or Gauss-Jacobi quadrature:
+This repository now tracks the PyTorch implementation of transformed
+diffusion-wave fractional PINNs for Caputo orders `alpha in (1, 2)`. The JAX
+workflow is preserved on the `jax-dev` branch. The PyTorch training code
+supports the transformed Type-I and Type-II formulas with either Monte Carlo
+or Gauss-Jacobi quadrature:
 
 | Method | Formula type | Quadrature |
 | --- | --- | --- |
@@ -37,10 +38,10 @@ increased. Type-I is usually less sensitive, but mixed precision between the
 model, sampled points, quadrature nodes, and reference tensors can still create
 incorrect comparisons or runtime dtype errors.
 
-Do not switch this branch to fp32 unless the fractional operators and Type-II
+Do not switch this implementation to fp32 unless the fractional operators and Type-II
 stability are re-audited end to end.
 
-The current PyTorch branch includes two one-dimensional benchmarks plus two
+The current PyTorch implementation includes two one-dimensional benchmarks plus two
 registered two-dimensional irregular-domain cases:
 
 | Case | Config | PDE class | Reference used for plots |
@@ -54,7 +55,7 @@ registered two-dimensional irregular-domain cases:
 
 For `alpha in (1, 2)`, the Caputo diffusion-wave operator is evaluated through
 transformed representations rather than by differentiating the network twice in
-time under a singular convolution kernel. In this branch:
+time under a singular convolution kernel. In this implementation:
 
 | Paper ingredient | PyTorch implementation |
 | --- | --- |
