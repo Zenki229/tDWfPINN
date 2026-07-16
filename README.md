@@ -150,13 +150,19 @@ python -c "import torch; print(torch.__version__); print(torch.cuda.is_available
 The forward benchmark solves
 
 ```math
-\begin{aligned}
-{}^C D_t^\alpha u - \frac{\lambda}{k^2\pi^2}u_{xx} &= 0,
-&& (t,x) \in (0,2] \times (0,1), \\
-u(t,0) = u(t,1) &= 0, \\
-u(0,x) &= a\sin(k\pi x), \\
-u_t(0,x) &= b\sin(k\pi x).
-\end{aligned}
+{}^C D_t^\alpha u - \frac{\lambda}{k^2\pi^2}u_{xx} = 0,
+\qquad (t,x) \in (0,2] \times (0,1).
+```
+
+with conditions
+
+```math
+\begin{gathered}
+u(t,0) = u(t,1) = 0, \\
+u(0,x) = a\sin(k\pi x),
+\qquad
+u_t(0,x) = b\sin(k\pi x).
+\end{gathered}
 ```
 
 The analytic solution used for evaluation is
@@ -176,13 +182,19 @@ The default config is `alpha=1.75`, `k=2`, `lambda=1`, `a=1`, and `b=1`.
 The Burgers benchmark solves
 
 ```math
-\begin{aligned}
-{}^C D_t^\alpha u + uu_x - \frac{0.01}{\pi}u_{xx} &= 0,
-&& (t,x) \in (0,1.2] \times (-1,1), \\
-u(t,-1) = u(t,1) &= 0, \\
-u(0,x) &= -\sin(\pi x), \\
-u_t(0,x) &= \beta\sin(\pi x).
-\end{aligned}
+{}^C D_t^\alpha u + uu_x - \frac{0.01}{\pi}u_{xx} = 0,
+\qquad (t,x) \in (0,1.2] \times (-1,1).
+```
+
+with conditions
+
+```math
+\begin{gathered}
+u(t,-1) = u(t,1) = 0, \\
+u(0,x) = -\sin(\pi x),
+\qquad
+u_t(0,x) = \beta\sin(\pi x).
+\end{gathered}
 ```
 
 The default config is `alpha=1.5`, `beta=2`, and `pde.datafile=data/burgers_150.npz`.
@@ -193,29 +205,44 @@ Reference arrays are available for `alpha=1.25`, `1.5`, and `1.75`.
 The circular-hole benchmark uses
 
 ```math
-\begin{aligned}
-\Omega &= (-1,1)^2 \setminus B_{0.25}((-0.3,0.2)), \\
+\Omega = (-1,1)^2 \setminus B_{0.25}((-0.3,0.2)).
+```
+
+On this domain, the governing equation is
+
+```math
 {}^C D_t^\alpha u
 - \nabla \cdot \left(a(x,y)\nabla u\right)
 + \mathbf{b}(x,y) \cdot \nabla u
 + \lambda u^3
-&= f(t,x,y), \\
-\alpha &= 1.5, \\
-a(x,y) &= 1 + 0.3\sin(\pi x)\cos(\pi y), \\
-\mathbf{b}(x,y) &= (1+y,\,x-1), \\
-\lambda &= 1.
-\end{aligned}
+= f(t,x,y).
+```
+
+The coefficients are
+
+```math
+\begin{gathered}
+\alpha = 1.5,
+\qquad
+\lambda = 1, \\
+a(x,y) = 1 + 0.3\sin(\pi x)\cos(\pi y), \\
+\mathbf{b}(x,y) = (1+y,\,x-1).
+\end{gathered}
 ```
 
 The manufactured exact solution is
 
 ```math
-\begin{aligned}
-u(t,x,y) &= q(t)\phi(x,y), \\
-q(t) &= t^2(1-t)^2, \\
-\phi(x,y) &= (1-x^2)(1-y^2)
+u(t,x,y) = q(t)\phi(x,y),
+\qquad
+q(t) = t^2(1-t)^2,
+```
+
+where
+
+```math
+\phi(x,y) = (1-x^2)(1-y^2)
 \left((x+0.3)^2+(y-0.2)^2-0.25^2\right).
-\end{aligned}
 ```
 
 Preview reference data:
@@ -227,15 +254,26 @@ Preview reference data:
 The L-shaped benchmark uses
 
 ```math
-\begin{aligned}
-\Omega_L &= [-1,1]^2 \setminus [0,1]^2, \\
-{}^C D_t^{1.8}u - 0.25\Delta u &= 0,
-&& (t,x,y) \in (0,1] \times \Omega_L, \\
-u &= 0,
-&& \text{on } \partial\Omega_L, \\
-u(0,x,y) &= g(x,y), \\
-u_t(0,x,y) &= 0.2g(x,y).
-\end{aligned}
+\Omega_L = [-1,1]^2 \setminus [0,1]^2.
+```
+
+The PDE is
+
+```math
+{}^C D_t^{1.8}u - 0.25\Delta u = 0,
+\qquad
+(t,x,y) \in (0,1] \times \Omega_L,
+```
+
+with conditions
+
+```math
+\begin{gathered}
+u = 0 \quad \text{on } \partial\Omega_L, \\
+u(0,x,y) = g(x,y),
+\qquad
+u_t(0,x,y) = 0.2g(x,y).
+\end{gathered}
 ```
 
 The initial profile is the three-bump profile implemented in

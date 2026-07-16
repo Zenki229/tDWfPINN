@@ -8,26 +8,35 @@ the time-fractional modal equations.
 ## PDE
 
 ```math
-\begin{aligned}
-\Omega_L &= [-1,1]^2 \setminus [0,1]^2, \\
-{}^C D_t^{1.8}u - 0.25\Delta u &= 0,
-&& (t,x,y) \in (0,1] \times \Omega_L, \\
-u &= 0,
-&& \text{on } \partial\Omega_L, \\
-u(0,x,y) &= g(x,y), \\
-u_t(0,x,y) &= 0.2g(x,y).
-\end{aligned}
+\Omega_L = [-1,1]^2 \setminus [0,1]^2.
+```
+
+```math
+{}^C D_t^{1.8}u - 0.25\Delta u = 0,
+\qquad
+(t,x,y) \in (0,1] \times \Omega_L,
+```
+
+with conditions
+
+```math
+\begin{gathered}
+u = 0 \quad \text{on } \partial\Omega_L, \\
+u(0,x,y) = g(x,y),
+\qquad
+u_t(0,x,y) = 0.2g(x,y).
+\end{gathered}
 ```
 
 The default initial profile is
 
 ```math
-\begin{aligned}
+\begin{split}
 g(x,y) ={}&
 \exp\!\left(-\frac{(x+0.55)^2+(y+0.45)^2}{0.08}\right) \\
 &-0.85\exp\!\left(-\frac{(x+0.55)^2+(y-0.45)^2}{0.06}\right) \\
 &+0.60\exp\!\left(-\frac{(x-0.45)^2+(y+0.55)^2}{0.06}\right).
-\end{aligned}
+\end{split}
 ```
 
 ## Generate
