@@ -1,4 +1,5 @@
-# Physics-Informed Neural Networks for time-fractional Diffusion-wave Equation 
+# Physics-Informed Neural Networks for the Time-Fractional Diffusion-Wave Equation
 
-## Example 1. 
-In the paper, we consider the warm-up problem from eqn(19), which is moduled in `dw_eg1.py`. 
+## Example 1
+
+The paper's warm-up problem from Equation (19) is implemented in `dw_eg1.py`.

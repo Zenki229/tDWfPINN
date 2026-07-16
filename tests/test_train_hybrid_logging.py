@@ -1,5 +1,6 @@
 import csv
 
+import torch
 from omegaconf import OmegaConf
 
 from src.train import Trainer
@@ -45,6 +46,32 @@ def test_loss_and_eval_schedule_helpers():
 
     assert Trainer._should_evaluate_epoch(trainer, 1, 3)
     assert Trainer._should_evaluate_epoch(trainer, 3, 3)
+
+
+def test_zero_rad_ratio_skips_candidate_sampling():
+    class TrainingSampler:
+        def sample(self):
+            return {"domain": torch.zeros((4, 2))}
+
+    class CandidateSampler:
+        def sample(self):
+            raise AssertionError("RAD candidates should not be sampled when ratio is zero")
+
+    trainer = Trainer.__new__(Trainer)
+    trainer.train_cfg = OmegaConf.create({
+        "batch_size": {"domain": 4},
+        "rad": {"use": True, "ratio": 0.0},
+    })
+    trainer.sampler = TrainingSampler()
+    trainer.rad_sampler = CandidateSampler()
+    trainer._last_rad_kept_points = object()
+    trainer._last_rad_selected_points = object()
+
+    points = Trainer._sample_training_points(trainer, step=1)
+
+    assert points["domain"].shape == (4, 2)
+    assert trainer._last_rad_kept_points is None
+    assert trainer._last_rad_selected_points is None
 
 
 def test_timing_record_writes_adam_and_lbfgs_losses(tmp_path, monkeypatch):

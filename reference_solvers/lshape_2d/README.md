@@ -1,37 +1,42 @@
 # 2D L-Shaped Reference Solver
 
 This folder contains the current L-shaped-domain reference generator used by
-the JAX irregular-domain benchmark. The implementation wraps the grid builder
+the PyTorch irregular-domain benchmark. The implementation wraps the grid builder
 from `lshape_case_package/` and uses backward-Euler convolution quadrature for
 the time-fractional modal equations.
 
 ## PDE
 
-```text
-Omega_L = [-1, 1]^2 \ [0, 1]^2
-
-{}^C D_t^1.8 u - 0.25 Delta u = 0,
-    (t, x, y) in (0, 1] x Omega_L
-
-u = 0 on partial Omega_L
-u(0, x, y) = g(x, y)
-u_t(0, x, y) = 0.2 g(x, y)
+```math
+\begin{aligned}
+\Omega_L &= [-1,1]^2 \setminus [0,1]^2, \\
+{}^C D_t^{1.8}u - 0.25\Delta u &= 0,
+&& (t,x,y) \in (0,1] \times \Omega_L, \\
+u &= 0,
+&& \text{on } \partial\Omega_L, \\
+u(0,x,y) &= g(x,y), \\
+u_t(0,x,y) &= 0.2g(x,y).
+\end{aligned}
 ```
 
 The default initial profile is
 
-```text
-g(x, y) =
-    exp(-((x + 0.55)^2 + (y + 0.45)^2) / 0.08)
-  - 0.85 exp(-((x + 0.55)^2 + (y - 0.45)^2) / 0.06)
-  + 0.60 exp(-((x - 0.45)^2 + (y + 0.55)^2) / 0.06)
+```math
+\begin{aligned}
+g(x,y) ={}&
+\exp\!\left(-\frac{(x+0.55)^2+(y+0.45)^2}{0.08}\right) \\
+&-0.85\exp\!\left(-\frac{(x+0.55)^2+(y-0.45)^2}{0.06}\right) \\
+&+0.60\exp\!\left(-\frac{(x-0.45)^2+(y+0.55)^2}{0.06}\right).
+\end{aligned}
 ```
 
 ## Generate
 
-From the repository root:
+Install the repository requirements, which include Matplotlib and Pillow, then
+run the generator from the repository root:
 
 ```bash
+python -m pip install -r requirements.txt
 python reference_solvers/lshape_2d/generate_lshape_reference.py
 ```
 

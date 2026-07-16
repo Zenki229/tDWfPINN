@@ -5,6 +5,8 @@ hydra-core
 tabulate
 wandb
 plotly
+matplotlib
+Pillow
 tqdm
 pymittagleffler
 omegaconf

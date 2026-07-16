@@ -19,13 +19,15 @@ set -euo pipefail
 #   TIMING_EPOCH_STEPS, LOSS_LOG_EVERY, EVAL_EVERY_STEPS, EVAL_EVERY_EPOCHS
 #   DOMAIN_BATCH, BOUNDARY_BATCH, INITIAL_BATCH
 #   RAD_USE, RAD_RATIO, RAD_DOMAIN_BATCH   (RAD only resamples interior/domain points)
-#   GJ_QUAD, MC_QUAD, HIDDEN_DIM, NUM_LAYERS, PLOT_GRID
+#   GJ_QUAD, MC_QUAD, HIDDEN_DIM, NUM_LAYERS
+#   PLOT_GRID          Manufactured-reference grid for irregular_hole only.
 #   ALPHAS              Burgers/L-shape reference alphas. Default: 1.25,1.5,1.75.
 #   FORWARD_ALPHAS      Optional dw_forward alpha sweep. Default: use config alpha.
 #   DATA_DIR            Directory containing burgers_*.npz. Default: data.
 #   PLOT_BACKEND        Plot backend. Default: matplotlib.
 #   PLOT_JPG            Optional plot.jpg override.
 #   WANDB_MODE          W&B mode. Default: disabled.
+#   WANDB_PROJECT       W&B project. Default: tDWfPINN.
 #   PYTHON              Python executable. Default: python.
 #   DRY_RUN             Print commands without running. Default: 0.
 
@@ -55,6 +57,7 @@ FORWARD_ALPHAS_CSV="${FORWARD_ALPHAS:-}"
 DATA_DIR="${DATA_DIR:-data}"
 PLOT_BACKEND="${PLOT_BACKEND:-matplotlib}"
 WANDB_MODE="${WANDB_MODE:-disabled}"
+WANDB_PROJECT="${WANDB_PROJECT:-tDWfPINN}"
 PYTHON_BIN="${PYTHON:-python}"
 DRY_RUN="${DRY_RUN:-0}"
 
@@ -63,6 +66,14 @@ trim() {
   value="${value#"${value%%[![:space:]]*}"}"
   value="${value%"${value##*[![:space:]]}"}"
   printf '%s' "${value}"
+}
+
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+to_upper() {
+  printf '%s' "$1" | tr '[:lower:]' '[:upper:]'
 }
 
 append_unique_csv() {
@@ -78,7 +89,9 @@ append_unique_csv() {
 }
 
 bool_value() {
-  case "${1,,}" in
+  local normalized
+  normalized="$(to_lower "$1")"
+  case "${normalized}" in
     1|true|yes|y|on) printf 'true' ;;
     0|false|no|n|off) printf 'false' ;;
     *)
@@ -90,11 +103,12 @@ bool_value() {
 
 normalize_cases() {
   local input="$1"
-  local normalized='' token
+  local normalized='' token token_lower
   IFS=',' read -r -a case_tokens <<< "${input}"
   for token in "${case_tokens[@]}"; do
     token="$(trim "${token}")"
-    case "${token,,}" in
+    token_lower="$(to_lower "${token}")"
+    case "${token_lower}" in
       1d|all_1d|all-1d)
         normalized="$(append_unique_csv "${normalized}" "dw_forward")"
         normalized="$(append_unique_csv "${normalized}" "burgers")"
@@ -113,7 +127,7 @@ normalize_cases() {
         normalized="$(append_unique_csv "${normalized}" "dw_forward")"
         ;;
       burgers|irregular_hole|lshape)
-        normalized="$(append_unique_csv "${normalized}" "${token,,}")"
+        normalized="$(append_unique_csv "${normalized}" "${token_lower}")"
         ;;
       *)
         printf 'Unsupported case: %s\n' "${token}" >&2
@@ -127,14 +141,14 @@ normalize_cases() {
 normalize_methods() {
   local input="$1"
   local normalized='' token method
-  if [[ "${input,,}" == "all" ]]; then
+  if [[ "$(to_lower "${input}")" == "all" ]]; then
     printf 'GJ-I,GJ-II,MC-I,MC-II'
     return
   fi
   IFS=',' read -r -a method_tokens <<< "${input}"
   for token in "${method_tokens[@]}"; do
     method="$(trim "${token}")"
-    method="${method^^}"
+    method="$(to_upper "${method}")"
     case "${method}" in
       GJ-I|GJ-II|MC-I|MC-II)
         normalized="$(append_unique_csv "${normalized}" "${method}")"
@@ -279,6 +293,7 @@ run_one() {
     "pde=${case_name}"
     "plot=${PLOT_BACKEND}"
     "wandb.mode=${WANDB_MODE}"
+    "wandb.project=${WANDB_PROJECT}"
     "pde.method=${method}"
     "trainer.max_steps=${STEPS}"
     "trainer.steps_per_epoch=${STEPS_PER_EPOCH}"
@@ -308,7 +323,7 @@ run_one() {
     cmd+=("pde.alpha=${alpha}" "pde.reference_data=${datafile}")
   fi
 
-  if [[ "${case_name}" == "irregular_hole" || "${case_name}" == "lshape" ]]; then
+  if [[ "${case_name}" == "irregular_hole" ]]; then
     cmd+=("pde.plot_grid=${PLOT_GRID}")
   fi
 

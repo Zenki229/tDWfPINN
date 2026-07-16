@@ -40,8 +40,16 @@ trim() {
   printf '%s' "${value}"
 }
 
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+to_upper() {
+  printf '%s' "$1" | tr '[:lower:]' '[:upper:]'
+}
+
 note() {
-  printf '%s%s%s\n' "${DIM}" "$*" "${RESET}"gbi
+  printf '%s%s%s\n' "${DIM}" "$*" "${RESET}"
 }
 
 ok() {
@@ -104,7 +112,7 @@ ask_value() {
   local label="$3"
   local validator="$4"
   local hint="${5:-}"
-  local input value
+  local input value input_lower
 
   while true; do
     printf '\n%s%s%s\n' "${CYAN}" "${label}" "${RESET}"
@@ -181,7 +189,7 @@ normalize_method_token() {
     return 0
   fi
 
-  token="${token^^}"
+  token="$(to_upper "${token}")"
   case "${token}" in
     GJ-I|GJ-II|MC-I|MC-II)
       printf '%s' "${token}"
@@ -225,7 +233,7 @@ choose_methods() {
       return
     fi
 
-    if [[ "${input,,}" == "all" ]]; then
+    if [[ "$(to_lower "${input}")" == "all" ]]; then
       METHODS_CSV="GJ-I,GJ-II,MC-I,MC-II"
       ok "METHODS_CSV=${METHODS_CSV}"
       return
@@ -270,7 +278,8 @@ ask_yes_no() {
     if [[ -z "${input}" || "${input}" == "pass" ]]; then
       value="${default}"
     else
-      case "${input,,}" in
+      input_lower="$(to_lower "${input}")"
+      case "${input_lower}" in
         y|yes|1|true|on) value="1" ;;
         n|no|0|false|off) value="0" ;;
         *)
@@ -359,6 +368,7 @@ print_summary() {
   print_row 'NUM_LAYERS' "${NUM_LAYERS}"
   print_row 'PLOT_GRID' "${PLOT_GRID}"
   print_row 'WANDB_MODE' "${WANDB_MODE}"
+  print_row 'WANDB_PROJECT' "${WANDB_PROJECT}"
   print_row 'PYTHON' "${PYTHON_BIN}"
 }
 
@@ -386,13 +396,14 @@ NUM_LAYERS="${NUM_LAYERS}" \\
 PLOT_GRID="${PLOT_GRID}" \\
 ALPHAS="${ALPHAS_CSV:-}" \\
 WANDB_MODE="${WANDB_MODE}" \\
+WANDB_PROJECT="${WANDB_PROJECT}" \\
 PYTHON="${PYTHON_BIN}" \\
 bash scripts/run_pytorch_cases.sh "${CASES_ARG}" "${METHODS_CSV}"
 EOF
 }
 
 confirm_and_run() {
-  local input
+  local input input_lower
 
   while true; do
     printf '\n%sAction%s\n' "${BOLD}" "${RESET}"
@@ -403,7 +414,8 @@ confirm_and_run() {
 
     input="$(read_or_exit)"
     input="$(trim "${input}")"
-    case "${input,,}" in
+    input_lower="$(to_lower "${input}")"
+    case "${input_lower}" in
       '')
         return 0
         ;;
@@ -467,7 +479,12 @@ main() {
     LBFGS_MAX_ITER="10"
     note 'Skipping L-BFGS max_iter because hybrid training is disabled.'
   fi
-  ask_value TIMING_EPOCH_STEPS "${STEPS}" "Timing row interval in Adam steps" is_positive_int
+  if [[ "${USE_LBFGS}" == "1" ]]; then
+    TIMING_EPOCH_STEPS="${STEPS_PER_EPOCH}"
+    note 'Hybrid timing writes one row per Adam + L-BFGS epoch, so the interval equals STEPS_PER_EPOCH.'
+  else
+    ask_value TIMING_EPOCH_STEPS "${STEPS}" "Timing row interval in Adam steps" is_positive_int
+  fi
   ask_value LOSS_LOG_EVERY "100" "Loss logging interval in Adam steps" is_uint "0 disables periodic loss logs"
   ask_value EVAL_EVERY_STEPS "${STEPS}" "Adam-only evaluation interval in steps" is_uint "0 means final evaluation only"
   ask_value EVAL_EVERY_EPOCHS "1" "Hybrid evaluation interval in epochs" is_uint "0 means final evaluation only"
@@ -485,8 +502,9 @@ main() {
   section '4. Model And Output'
   ask_value HIDDEN_DIM "64" "MLP hidden width" is_positive_int
   ask_value NUM_LAYERS "4" "MLP hidden layers" is_positive_int
-  ask_value PLOT_GRID "80" "2D plot grid" is_positive_int
+  ask_value PLOT_GRID "80" "Manufactured 2D plot grid (irregular_hole only)" is_positive_int
   choose_one WANDB_MODE "disabled" "W&B mode" "disabled" "offline" "online"
+  ask_value WANDB_PROJECT "${WANDB_PROJECT:-tDWfPINN}" "W&B project" is_nonempty
   ask_value PYTHON_BIN "${PYTHON:-python}" "Python executable" is_nonempty
 
   print_summary
@@ -496,7 +514,7 @@ main() {
   export TIMING_EPOCH_STEPS LOSS_LOG_EVERY EVAL_EVERY_STEPS EVAL_EVERY_EPOCHS
   export DOMAIN_BATCH BOUNDARY_BATCH INITIAL_BATCH
   export RAD_USE RAD_RATIO RAD_DOMAIN_BATCH
-  export GJ_QUAD MC_QUAD HIDDEN_DIM NUM_LAYERS PLOT_GRID WANDB_MODE
+  export GJ_QUAD MC_QUAD HIDDEN_DIM NUM_LAYERS PLOT_GRID WANDB_MODE WANDB_PROJECT
   export ALPHAS="${ALPHAS_CSV:-}"
   export PYTHON="${PYTHON_BIN}"
 

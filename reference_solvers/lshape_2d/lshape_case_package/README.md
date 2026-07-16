@@ -5,8 +5,8 @@ This package contains the original L-shaped-domain helper code used by
 
 ## Domain
 
-```text
-Omega_L = [-1, 1]^2 \ [0, 1]^2
+```math
+\Omega_L = [-1,1]^2 \setminus [0,1]^2.
 ```
 
 ## Contents
@@ -14,8 +14,8 @@ Omega_L = [-1, 1]^2 \ [0, 1]^2
 | Path | Role |
 | --- | --- |
 | `code/lshape_fd_reference_and_gif.py` | Self-contained finite-difference grid builder, eigenmode reference preview, and GIF generator. |
-| `code/lshape_fractional_dw_fem_reference.py` | Higher-fidelity scikit-fem reference prototype on the built-in L-shaped mesh. |
-| `figures/` | Preview heatmaps, surface plots, and GIFs from the original package. |
+| `code/lshape_fractional_dw_fem_reference.py` | Historical scikit-fem prototype for a different L-shaped PDE, coefficient field, initial profile, and initial velocity; it is not a drop-in reference for the current benchmark. |
+| `figures/` | Generated preview heatmaps, surface plots, and GIFs; the repository currently tracks the GIF preview. |
 | `tex/lshape_case_description.tex` | Manuscript-ready LaTeX case description. |
 
 ## Install Package Extras
@@ -36,8 +36,8 @@ python code/lshape_fd_reference_and_gif.py
 python code/lshape_fractional_dw_fem_reference.py
 ```
 
-For the repository's current reference data used by JAX training, prefer the
-root-level command:
+For the repository's current reference data used by PyTorch training, prefer
+the following command from the repository root:
 
 ```bash
 python reference_solvers/lshape_2d/generate_lshape_reference.py

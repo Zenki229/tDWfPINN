@@ -21,7 +21,7 @@ def main() -> None:
     p.add_argument(
         "--metric",
         choices=["graph_allocated_bytes", "graph_peak_delta_bytes", "backward_peak_delta_bytes"],
-        default="graph_allocated_bytes",
+        default="graph_peak_delta_bytes",
     )
     args = p.parse_args()
     plot_order_csv(args.csv, metric=args.metric, kind="storage", out_dir=args.out_dir, drop_first_pair=args.drop_first_pair)

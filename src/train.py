@@ -252,12 +252,17 @@ class Trainer:
         if step == 0 and not rad_on_first:
             return points
 
+        n_rad = int(self.train_cfg.rad.ratio * self.train_cfg.batch_size.domain)
+        n_rad = min(max(n_rad, 0), points["domain"].shape[0])
+        if n_rad == 0:
+            self._last_rad_kept_points = None
+            self._last_rad_selected_points = None
+            return points
+
         rad_points_raw = self.rad_sampler.sample()
         res_dict = self.pde.residual(self.model, rad_points_raw)
         res_domain = res_dict["domain"]
 
-        n_rad = int(self.train_cfg.rad.ratio * self.train_cfg.batch_size.domain)
-        n_rad = min(max(n_rad, 1), points["domain"].shape[0])
         rad_selected = self.sampler.rad_sampler(
             res_domain,
             rad_points_raw["domain"],

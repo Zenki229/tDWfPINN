@@ -5,10 +5,11 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-active-ee4c2c.svg)](https://pytorch.org/)
 
 This repository now tracks the PyTorch implementation of transformed
-diffusion-wave fractional PINNs for Caputo orders `alpha in (1, 2)`. The JAX
-workflow is preserved on the `jax-dev` branch. The PyTorch training code
-supports the transformed Type-I and Type-II formulas with either Monte Carlo
-or Gauss-Jacobi quadrature:
+diffusion-wave fractional PINNs for Caputo orders $\alpha \in (1, 2)$. The JAX
+workflow is under development on the `jax-dev` branch. This codebase has been
+built with assistance from OpenAI Codex. The PyTorch training code supports the
+transformed Type-I and Type-II formulas with either Monte Carlo or Gauss-Jacobi
+quadrature:
 
 | Method | Formula type | Quadrature |
 | --- | --- | --- |
@@ -31,9 +32,9 @@ optimizers. Keep this default for all reported runs.
 
 This is not only a quality setting. The transformed Type-II formulas
 (`MC-II` and `GJ-II`) subtract nearby network values and divide by small
-time-increment powers such as `tau^2` and `t^alpha`. In fp32, the cancellation
+time-increment powers such as $\tau^2$ and $t^\alpha$. In fp32, the cancellation
 and small denominators can amplify roundoff enough to make the residual and
-loss blow up, especially near `t = 0` or when the quadrature resolution is
+loss blow up, especially near $t = 0$ or when the quadrature resolution is
 increased. Type-I is usually less sensitive, but mixed precision between the
 model, sampled points, quadrature nodes, and reference tensors can still create
 incorrect comparisons or runtime dtype errors.
@@ -53,7 +54,7 @@ registered two-dimensional irregular-domain cases:
 
 ## Paper Context
 
-For `alpha in (1, 2)`, the Caputo diffusion-wave operator is evaluated through
+For $\alpha \in (1, 2)$, the Caputo diffusion-wave operator is evaluated through
 transformed representations rather than by differentiating the network twice in
 time under a singular convolution kernel. In this implementation:
 
@@ -65,7 +66,8 @@ time under a singular convolution kernel. In this implementation:
 | Monte Carlo quadrature for the same transformed integrals | `pde.monte_carlo_params.nums` and `pde.monte_carlo_params.eps` |
 | Type-I/Type-II timing comparison | `timing.csv` with one row per `trainer.timing.epoch_steps` optimizer steps |
 
-The practical distinction is that Type-I evaluates shifted time derivatives,
+The practical distinction is that Type-I evaluates shifted time derivatives
+$\partial_t u_\theta$,
 whereas Type-II evaluates shifted network values. The timing scripts expose
 both choices for MC and GJ so the cost can be compared with the same model,
 batch sizes, and quadrature counts.
@@ -147,21 +149,24 @@ python -c "import torch; print(torch.__version__); print(torch.cuda.is_available
 
 The forward benchmark solves
 
-```text
-{}^C D_t^alpha u - lambda / (k^2 pi^2) u_xx = 0,
-    (t, x) in (0, 2] x (0, 1),
-
-u(t, 0) = u(t, 1) = 0,
-u(0, x) = a sin(k pi x),
-u_t(0, x) = b sin(k pi x).
+```math
+\begin{aligned}
+{}^C D_t^\alpha u - \frac{\lambda}{k^2\pi^2}u_{xx} &= 0,
+&& (t,x) \in (0,2] \times (0,1), \\
+u(t,0) = u(t,1) &= 0, \\
+u(0,x) &= a\sin(k\pi x), \\
+u_t(0,x) &= b\sin(k\pi x).
+\end{aligned}
 ```
 
 The analytic solution used for evaluation is
 
-```text
-u(t, x) = sin(k pi x)
-          [a E_{alpha,1}(-lambda t^alpha)
-           + b t E_{alpha,2}(-lambda t^alpha)].
+```math
+u(t,x) = \sin(k\pi x)
+\left[
+aE_{\alpha,1}(-\lambda t^\alpha)
++ btE_{\alpha,2}(-\lambda t^\alpha)
+\right].
 ```
 
 The default config is `alpha=1.75`, `k=2`, `lambda=1`, `a=1`, and `b=1`.
@@ -170,13 +175,14 @@ The default config is `alpha=1.75`, `k=2`, `lambda=1`, `a=1`, and `b=1`.
 
 The Burgers benchmark solves
 
-```text
-{}^C D_t^alpha u + u u_x - (0.01 / pi) u_xx = 0,
-    (t, x) in (0, 1.2] x (-1, 1),
-
-u(t, -1) = u(t, 1) = 0,
-u(0, x) = -sin(pi x),
-u_t(0, x) = beta sin(pi x).
+```math
+\begin{aligned}
+{}^C D_t^\alpha u + uu_x - \frac{0.01}{\pi}u_{xx} &= 0,
+&& (t,x) \in (0,1.2] \times (-1,1), \\
+u(t,-1) = u(t,1) &= 0, \\
+u(0,x) &= -\sin(\pi x), \\
+u_t(0,x) &= \beta\sin(\pi x).
+\end{aligned}
 ```
 
 The default config is `alpha=1.5`, `beta=2`, and `pde.datafile=data/burgers_150.npz`.
@@ -186,25 +192,30 @@ Reference arrays are available for `alpha=1.25`, `1.5`, and `1.75`.
 
 The circular-hole benchmark uses
 
-```text
-Omega = (-1, 1)^2 \ B_0.25((-0.3, 0.2)),
-
-{}^C D_t^alpha u - div(a(x, y) grad u)
-    + b(x, y) . grad u + lambda u^3 = f(t, x, y),
-
-alpha = 1.5,
-a(x, y) = 1 + 0.3 sin(pi x) cos(pi y),
-b(x, y) = (1 + y, x - 1),
-lambda = 1.
+```math
+\begin{aligned}
+\Omega &= (-1,1)^2 \setminus B_{0.25}((-0.3,0.2)), \\
+{}^C D_t^\alpha u
+- \nabla \cdot \left(a(x,y)\nabla u\right)
++ \mathbf{b}(x,y) \cdot \nabla u
++ \lambda u^3
+&= f(t,x,y), \\
+\alpha &= 1.5, \\
+a(x,y) &= 1 + 0.3\sin(\pi x)\cos(\pi y), \\
+\mathbf{b}(x,y) &= (1+y,\,x-1), \\
+\lambda &= 1.
+\end{aligned}
 ```
 
 The manufactured exact solution is
 
-```text
-u(t, x, y) = q(t) phi(x, y),
-q(t) = t^2 (1 - t)^2,
-phi(x, y) = (1 - x^2)(1 - y^2)
-            ((x + 0.3)^2 + (y - 0.2)^2 - 0.25^2).
+```math
+\begin{aligned}
+u(t,x,y) &= q(t)\phi(x,y), \\
+q(t) &= t^2(1-t)^2, \\
+\phi(x,y) &= (1-x^2)(1-y^2)
+\left((x+0.3)^2+(y-0.2)^2-0.25^2\right).
+\end{aligned}
 ```
 
 Preview reference data:
@@ -215,32 +226,33 @@ Preview reference data:
 
 The L-shaped benchmark uses
 
-```text
-Omega_L = [-1, 1]^2 \ [0, 1]^2,
-
-{}^C D_t^1.8 u - 0.25 Delta u = 0,
-    (t, x, y) in (0, 1] x Omega_L,
-
-u = 0 on partial Omega_L,
-u(0, x, y) = g(x, y),
-u_t(0, x, y) = 0.2 g(x, y).
+```math
+\begin{aligned}
+\Omega_L &= [-1,1]^2 \setminus [0,1]^2, \\
+{}^C D_t^{1.8}u - 0.25\Delta u &= 0,
+&& (t,x,y) \in (0,1] \times \Omega_L, \\
+u &= 0,
+&& \text{on } \partial\Omega_L, \\
+u(0,x,y) &= g(x,y), \\
+u_t(0,x,y) &= 0.2g(x,y).
+\end{aligned}
 ```
 
 The initial profile is the three-bump profile implemented in
 [`src/physics/irregular_2d.py`](src/physics/irregular_2d.py). Training uses
 `data/lshape/lshape_reference.npz` for plotting the reference solution at
-`t=T/2` and `t=T`. The README preview below uses the longer `T=5` GIF only to
+$t=T/2$ and $t=T$. The README preview below uses the longer $T=5$ GIF only to
 make the wave-like evolution easier to inspect.
 
 ![L-shaped reference, T=5](data/lshape/lshape_reference_T5.gif)
 
 Reference W&B project for the L-shape runs:
-[`tDWfPINN_lshape2D`](https://wandb.ai/zenki229/tDWfPINN_lshape2D/overview).
+[`tDWfPINN_lshape2D`](https://wandb.ai/zenki229/tDWfPINN_lshape2D?nw=nwuserzenki).
 
 Launch the full L-shape MC-I / GJ-II comparison with:
 
 ```bash
-STEPS="100000" STEPS_PER_EPOCH="5000" USE_LBFGS="1" LBFGS_MAX_ITER="2000" TIMING_EPOCH_STEPS="5000" LOSS_LOG_EVERY="100" EVAL_EVERY_STEPS="5000" EVAL_EVERY_EPOCHS="1" DOMAIN_BATCH="20000" BOUNDARY_BATCH="5000" INITIAL_BATCH="5000" RAD_USE="0" RAD_RATIO="0.3" RAD_DOMAIN_BATCH="100000" GJ_QUAD="64" MC_QUAD="256" HIDDEN_DIM="64" NUM_LAYERS="6" PLOT_GRID="80" ALPHAS="1.25,1.5,1.75" WANDB_MODE="online" PYTHON="python" bash scripts/run_pytorch_cases.sh "lshape" "MC-I,GJ-II"
+STEPS="100000" STEPS_PER_EPOCH="5000" USE_LBFGS="1" LBFGS_MAX_ITER="2000" TIMING_EPOCH_STEPS="5000" LOSS_LOG_EVERY="100" EVAL_EVERY_STEPS="5000" EVAL_EVERY_EPOCHS="1" DOMAIN_BATCH="20000" BOUNDARY_BATCH="5000" INITIAL_BATCH="5000" RAD_USE="0" RAD_RATIO="0.3" RAD_DOMAIN_BATCH="100000" GJ_QUAD="64" MC_QUAD="256" HIDDEN_DIM="64" NUM_LAYERS="6" ALPHAS="1.25,1.5,1.75" WANDB_MODE="online" WANDB_PROJECT="tDWfPINN_lshape2D" PYTHON="python" bash scripts/run_pytorch_cases.sh "lshape" "MC-I,GJ-II"
 ```
 
 ## Training
@@ -282,7 +294,9 @@ For this path, `epochs = trainer.max_steps // trainer.steps_per_epoch`. Each
 epoch samples one batch, applies RAD when enabled, runs Adam for
 `trainer.steps_per_epoch` updates on that batch, then runs one PyTorch L-BFGS
 phase using `optimizer.lbfgs.max_iter`. Timing records only the Adam phase, and
-both Adam and L-BFGS losses are logged.
+both Adam and L-BFGS losses are logged. Hybrid timing writes one row per epoch,
+so its interval is `trainer.steps_per_epoch`; `trainer.timing.epoch_steps`
+controls only Adam-only runs.
 
 Training loss is logged every `trainer.loss_log_every_steps` Adam steps
 (default `100`). Relative error, plotting, and checkpoint storage happen at
@@ -342,7 +356,7 @@ Important script parameters:
 | `STEPS_PER_EPOCH` | Adam updates per hybrid epoch | `5000` |
 | `USE_LBFGS` | Enable hybrid Adam + L-BFGS | `0` |
 | `LBFGS_MAX_ITER` | L-BFGS iterations per hybrid epoch | `10` |
-| `TIMING_EPOCH_STEPS` | Steps per timing row | `5000` |
+| `TIMING_EPOCH_STEPS` | Adam-only steps per timing row; hybrid runs use `STEPS_PER_EPOCH` | `5000` |
 | `LOSS_LOG_EVERY` | Adam steps between loss logs | `100` |
 | `EVAL_EVERY_STEPS` | Adam-only evaluation interval | `5000` |
 | `EVAL_EVERY_EPOCHS` | Hybrid evaluation interval | `1` |
@@ -356,8 +370,9 @@ Important script parameters:
 | `MC_QUAD` | Monte Carlo samples | case default |
 | `HIDDEN_DIM` | MLP hidden width | `64` |
 | `NUM_LAYERS` | MLP hidden layers | `4` |
-| `PLOT_GRID` | 2D plot grid | `80` |
+| `PLOT_GRID` | Manufactured-reference grid for `irregular_hole`; L-shape uses its NPZ grid | `80` |
 | `WANDB_MODE` | W&B mode | `disabled` |
+| `WANDB_PROJECT` | W&B project name | `tDWfPINN` |
 | `PYTHON` | Python executable | `python` |
 
 The old launchers remain available as compatibility wrappers:
@@ -405,7 +420,7 @@ cases contribute one each.
 | Enable Adam + L-BFGS hybrid training? | `USE_LBFGS` | `optimizer.lbfgs.use` |
 | Adam steps per hybrid epoch | `STEPS_PER_EPOCH` | `trainer.steps_per_epoch` |
 | L-BFGS max_iter per hybrid epoch | `LBFGS_MAX_ITER` | `optimizer.lbfgs.max_iter` (only emitted when hybrid is on) |
-| Timing row interval in Adam steps | `TIMING_EPOCH_STEPS` | `trainer.timing.epoch_steps` |
+| Timing row interval in Adam steps | `TIMING_EPOCH_STEPS` | `trainer.timing.epoch_steps` for Adam-only runs; hybrid runs set it to `STEPS_PER_EPOCH`. |
 | Loss logging interval in Adam steps | `LOSS_LOG_EVERY` | `trainer.loss_log_every_steps` (0 disables periodic logs) |
 | Adam-only evaluation interval in steps | `EVAL_EVERY_STEPS` | `trainer.eval_every_steps` (0 keeps only the final evaluation) |
 | Hybrid evaluation interval in epochs | `EVAL_EVERY_EPOCHS` | `trainer.eval_every_epochs` (0 keeps only the final evaluation) |
@@ -429,8 +444,9 @@ cases contribute one each.
 | --- | --- | --- |
 | MLP hidden width | `HIDDEN_DIM` | `model.hidden_dim` |
 | MLP hidden layers | `NUM_LAYERS` | `model.num_layers` |
-| 2D plot grid | `PLOT_GRID` | `pde.plot_grid` (only for `irregular_hole` and `lshape`) |
+| Manufactured 2D plot grid | `PLOT_GRID` | `pde.plot_grid` for `irregular_hole`; L-shape uses the grid stored in its reference NPZ. |
 | W&B mode | `WANDB_MODE` | `wandb.mode` (`disabled`, `offline`, `online`) |
+| W&B project | `WANDB_PROJECT` | `wandb.project` |
 | Python executable | `PYTHON` | Process launched as `${PYTHON} src/train.py ...` |
 
 Case-dependent defaults: when the selected case is `burgers`, the batch and
@@ -457,15 +473,20 @@ outputs/pytorch_burgers/alpha<alpha>/<method>/<YYYY-MM-DD_HH-MM-SS>/
 outputs/pytorch_1d/dw_forward/<method>/<YYYY-MM-DD_HH-MM-SS>/
 ```
 
-Each run directory contains:
+Every run directory contains:
 
 | Output | Description |
 | --- | --- |
 | `.hydra/` | Resolved Hydra config for the run. |
 | `checkpoint_<step>.pt` | Model checkpoint saved at evaluation steps. |
 | `timing.csv` | Paper-style timing rows. |
-| `results/plots/*.jpg` | Independent `true`, `sol`, and `abs_error` figures. |
-| `results/raw_data/*.npz` | Raw arrays used by each plotted panel. |
+
+Evaluation artifacts depend on the case dimension:
+
+| Case | Plot and raw-data outputs |
+| --- | --- |
+| 1D | `prediction_step_<step>.jpg` plus the matching raw prediction `.npz`. |
+| 2D | Independent `true`, `sol`, and `abs_error` JPG files plus one raw `.npz` per panel. |
 
 The timing file has this schema:
 
@@ -482,7 +503,7 @@ W&B is disabled by default for local smoke tests. To log online:
 
 ```bash
 wandb login
-python src/train.py pde=lshape wandb.mode=online wandb.project=tDWfPINN wandb.entity=<your-entity>
+python src/train.py pde=lshape wandb.mode=online wandb.project=tDWfPINN_lshape2D wandb.entity=zenki229
 ```
 
 Set `wandb.mode=offline` on machines without network access but where you still

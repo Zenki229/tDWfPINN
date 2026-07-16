@@ -3,4 +3,5 @@ scipy
 matplotlib
 mpmath
 imageio
+Pillow
 scikit-fem

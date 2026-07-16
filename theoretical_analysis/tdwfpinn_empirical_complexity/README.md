@@ -4,10 +4,11 @@ This package performs **computational** verification of the storage and training
 
 The code constructs a real bias-free `torch.nn.Module`, builds the generalized Gauss--Jacobi fractional residual graph, and compares:
 
-- `GJ-I`: shifted quadrature nodes use time-derivative graphs, i.e. `partial_t u_theta`;
-- `GJ-II`: shifted quadrature nodes use ordinary value graphs, i.e. `u_theta`.
+- `GJ-I`: shifted quadrature nodes use time-derivative graphs, i.e.
+  $\partial_t u_\theta$;
+- `GJ-II`: shifted quadrature nodes use ordinary value graphs, i.e. $u_\theta$.
 
-All derivative computations use the PDE implementation in:
+The generalized GJ operators are implemented in:
 
 ```text
 tdw_verify/generalized_gj.py
@@ -25,8 +26,8 @@ network = bias-free tanh MLP
 
 The bias-free network is used to match the paper's dense-layer MAC definition:
 
-```text
-A_mac = H d + (L - 1) H^2 + H.
+```math
+A_{\mathrm{mac}} = Hd + (L-1)H^2 + H.
 ```
 
 Only dense matrix multiplications and activation-related operations are counted in the theoretical FLOPs formulas; bias additions and bias-gradient reductions are not included.
@@ -36,7 +37,7 @@ Only dense matrix multiplications and activation-related operations are counted 
 ## 1. File structure
 
 ```text
-tdwfpinn_empirical_complexity_v6/
+tdwfpinn_empirical_complexity/
 ├── README.md
 ├── requirements.txt
 ├── scripts/
@@ -78,8 +79,12 @@ bash scripts/run_all_gpu.sh
 
 ## 2. Installation
 
+From the repository root:
+
 ```bash
-cd tdwfpinn_empirical_complexity_v6
+cd theoretical_analysis/tdwfpinn_empirical_complexity
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
@@ -197,8 +202,8 @@ graph_peak_delta_bytes = max_memory_allocated_during_loss_build - memory_allocat
 
 The plotted storage saving is:
 
-```text
-storage_saving = measured_storage(GJ-I) - measured_storage(GJ-II)
+```math
+\Delta S = S_{\mathrm{GJ\text{-}I}} - S_{\mathrm{GJ\text{-}II}}.
 ```
 
 ### Why the default metric is `graph_peak_delta_bytes`
@@ -213,8 +218,8 @@ This metric measures the **peak CUDA allocation during generalized GJ loss const
 
 This choice matters especially for the `d` sweep.  The predicted storage saving contains a dimension-dependent term:
 
-```text
-Delta S = O(N M d + N M L H).
+```math
+\Delta S = \mathcal{O}(NMd + NMLH).
 ```
 
 In the implementation, the `d`-dependent tensors in `GJ-I` can appear as transient allocations during the construction of shifted time-derivative graphs.  Examples include:
@@ -224,7 +229,10 @@ shifted points        ~ shape (N M, d)
 full input gradients  ~ shape (N M, d)
 ```
 
-Even though the final residual only needs the time component `partial_t u_theta`, autograd may temporarily allocate the full input-gradient tensor with all `d` coordinates.  Some of these tensors are released or reused before the final loss object remains alive.
+Even though the final residual only needs the time component
+$\partial_t u_\theta$, autograd may temporarily allocate the full
+input-gradient tensor with all $d$ coordinates. Some of these tensors are
+released or reused before the final loss object remains alive.
 
 Therefore:
 
@@ -240,7 +248,8 @@ By contrast:
 graph_peak_delta_bytes
 ```
 
-captures the maximum allocation during graph construction, so it can reveal the `O(N M d)` contribution more clearly.
+captures the maximum allocation during graph construction, so it can reveal the
+$\mathcal{O}(NMd)$ contribution more clearly.
 
 In short:
 
@@ -255,9 +264,9 @@ You can still plot retained graph memory explicitly:
 
 ```bash
 python scripts/plot_storage_orders.py \
-  --csv outputs/storage_<timestamp>/storage_sweep.csv \
+  --csv outputs/storage_20260525_153020/storage_sweep.csv \
   --metric graph_allocated_bytes \
-  --out-dir outputs/storage_<timestamp>/storage_plots_allocated
+  --out-dir outputs/storage_20260525_153020/storage_plots_allocated
 ```
 
 ---
@@ -297,6 +306,7 @@ outputs/storage_<timestamp>/storage_plots/storage_saving_vs_M.png
 outputs/storage_<timestamp>/storage_plots/storage_saving_vs_d.png
 outputs/storage_<timestamp>/storage_plots/storage_saving_vs_L.png
 outputs/storage_<timestamp>/storage_plots/storage_saving_vs_H.png
+outputs/storage_<timestamp>/storage_plots/storage_saving_processed.csv
 outputs/storage_<timestamp>/storage_plots/storage_slope_summary.csv
 ```
 
@@ -308,8 +318,8 @@ graph_peak_delta_bytes
 
 The output plots show the measured saving:
 
-```text
-Delta S = S_GJ-I - S_GJ-II
+```math
+\Delta S = S_{\mathrm{GJ\text{-}I}} - S_{\mathrm{GJ\text{-}II}}
 ```
 
 for each sweep variable.
@@ -333,6 +343,7 @@ outputs/flops_<timestamp>/flops_plots/flops_saving_vs_M.png
 outputs/flops_<timestamp>/flops_plots/flops_saving_vs_d.png
 outputs/flops_<timestamp>/flops_plots/flops_saving_vs_L.png
 outputs/flops_<timestamp>/flops_plots/flops_saving_vs_H.png
+outputs/flops_<timestamp>/flops_plots/flops_saving_processed.csv
 outputs/flops_<timestamp>/flops_plots/flops_slope_summary.csv
 ```
 
@@ -345,8 +356,8 @@ with torch.profiler.profile(with_flops=True):
 
 The plotted FLOPs saving is:
 
-```text
-flops_saving = measured_backward_flops(GJ-I) - measured_backward_flops(GJ-II)
+```math
+\Delta F = F_{\mathrm{GJ\text{-}I}} - F_{\mathrm{GJ\text{-}II}}.
 ```
 
 PyTorch profiler FLOPs are operator-level estimates.  They usually count dense matrix multiplications reliably.  Some elementwise autograd operations may report zero FLOPs depending on the PyTorch build, so the package also records:
@@ -434,28 +445,30 @@ python scripts/run_storage_sweep.py \
 
 The measured storage saving is expected to follow:
 
-```text
-Delta S = O(N M d + N M L H).
+```math
+\Delta S = \mathcal{O}(NMd + NMLH).
 ```
 
 With fp64 tensor data, the theoretical storage saving used in the paper is:
 
-```text
-Delta S = 8 N M (d + 2 L H) bytes.
+```math
+\Delta S = 8NM(d+2LH)\ \text{bytes}.
 ```
 
 The measured backward-FLOPs saving is expected to follow:
 
-```text
-Delta F = N M [4{H d + (L - 1)H^2 + H} + 5 L H].
+```math
+\Delta F = NM\left[4\left\{Hd+(L-1)H^2+H\right\}+5LH\right].
 ```
 
 Therefore:
 
-- storage saving is approximately linear in `N`, `M`, `d`, `L`, and `H`;
-- backward-FLOPs saving is linear in `N`, `M`, and `d`;
-- backward-FLOPs saving can grow quadratically in `H` when the dense hidden-to-hidden term `(L - 1)H^2` dominates;
-- for small `d`, the term `2 L H` can dominate `d + 2 L H`, so a small `d` sweep may look nearly flat unless `d` is large enough or `L,H` are reduced.
+- storage saving is approximately linear in $N$, $M$, $d$, $L$, and $H$;
+- backward-FLOPs saving is linear in $N$, $M$, and $d$;
+- backward-FLOPs saving can grow quadratically in $H$ when the dense
+  hidden-to-hidden term $(L-1)H^2$ dominates;
+- for small $d$, the term $2LH$ can dominate $d+2LH$, so a small $d$ sweep may
+  look nearly flat unless $d$ is large enough or $L,H$ are reduced.
 
 For the `d` sweep, `graph_peak_delta_bytes` is preferred over `graph_allocated_bytes` because it captures transient dimension-dependent allocations during graph construction.
 
@@ -465,20 +478,25 @@ For the `d` sweep, `graph_peak_delta_bytes` is preferred over `graph_allocated_b
 
 Each plot uses measured data, not theoretical formula values.
 
-The plotting scripts aggregate repeated measurements by median.  Median aggregation is used because CUDA memory and profiler measurements can contain occasional allocator or kernel-dispatch outliers.
+The plotting scripts report both mean $\pm$ standard deviation and median for
+repeated measurements. The fitted scaling slope uses the median because CUDA
+memory and profiler measurements can contain occasional allocator or
+kernel-dispatch outliers.
 
 For log-log slope fitting, the script fits:
 
-```text
-log(Delta) = a log(x) + b
+```math
+\log(\Delta) = a\log(x) + b,
 ```
 
-where `a` is the fitted scaling exponent.
+where $a$ is the fitted scaling exponent.
 
 If a sweep variable has an additive background term, the log-log slope may be smaller than the asymptotic theoretical exponent for small values.  This is especially relevant for the `d` sweep, since:
 
-```text
-Delta S = 8 N M (d + 2 L H).
+```math
+\Delta S = 8NM(d+2LH).
 ```
 
-When `d << 2 L H`, the storage saving is dominated by `2 L H`, so the curve may look almost constant in `d`.  Increasing the `d` range or decreasing `L,H` makes the `O(d)` contribution easier to observe.
+When $d \ll 2LH$, the storage saving is dominated by $2LH$, so the curve may
+look almost constant in $d$. Increasing the $d$ range or decreasing $L,H$ makes
+the $\mathcal{O}(d)$ contribution easier to observe.

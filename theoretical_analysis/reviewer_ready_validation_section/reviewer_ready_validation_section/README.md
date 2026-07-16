@@ -16,5 +16,5 @@ This package revises the manuscript's validation section in response to reviewer
 3. The effect of quadrature size `M` is separated into Monte Carlo sampling behavior and Gauss-Jacobi endpoint-cancellation behavior.
 4. The fp16/fp8-like experiment is clearly framed as a quotient-level precision diagnostic.
 5. Remark 3.1 is presented as an asymptotic numerical check of the leading bias and conditioning components.
-6. The MC `M^{-1/2}` and GJ `rho^{-2M}` rates are summarized in a numerical table.
+6. The MC $M^{-1/2}$ and GJ $\rho^{-2M}$ rates are summarized in a numerical table.
 7. The nonsmooth example states the precise regularity loss and maps the interior kink to the memory variable.
